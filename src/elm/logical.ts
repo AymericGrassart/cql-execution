@@ -8,7 +8,11 @@ export class And extends Expression {
   }
 
   exec(ctx: Context) {
-    return ThreeValuedLogic.and(...this.execArgs(ctx));
+    if (this.args == null || this.args.length !== 2) {
+      throw new Error('Invalid arguments for And expression.');
+    }
+    return ThreeValuedLogic.andShortCircuit(this.args[0], this.args[1], ctx);
+    // return ThreeValuedLogic.and(...this.execArgs(ctx));
   }
 }
 
