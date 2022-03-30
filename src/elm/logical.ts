@@ -22,7 +22,11 @@ export class Or extends Expression {
   }
 
   exec(ctx: Context) {
-    return ThreeValuedLogic.or(...this.execArgs(ctx));
+    if (this.args == null || this.args.length !== 2) {
+      throw new Error('Invalid arguments for And expression.');
+    }
+    return ThreeValuedLogic.orShortCircuit(this.args[0], this.args[1], ctx);
+    //return ThreeValuedLogic.or(...this.execArgs(ctx));
   }
 }
 

@@ -2423,6 +2423,24 @@ exports.ThreeValuedLogic = void 0;
 var ThreeValuedLogic = /** @class */ (function () {
     function ThreeValuedLogic() {
     }
+    ThreeValuedLogic.andShortCircuit = function (left, right, ctx) {
+        var leftEval = left.execute(ctx);
+        if (leftEval === false) {
+            return false;
+        }
+        else {
+            var rightEval = right.execute(ctx);
+            if (rightEval === false) {
+                return false;
+            }
+            else if (rightEval == null || leftEval == null) {
+                return null;
+            }
+            else {
+                return true;
+            }
+        }
+    };
     ThreeValuedLogic.and = function () {
         var val = [];
         for (var _i = 0; _i < arguments.length; _i++) {
@@ -2436,6 +2454,24 @@ var ThreeValuedLogic = /** @class */ (function () {
         }
         else {
             return true;
+        }
+    };
+    ThreeValuedLogic.orShortCircuit = function (left, right, ctx) {
+        var leftEval = left.execute(ctx);
+        if (leftEval === true) {
+            return true;
+        }
+        else {
+            var rightEval = right.execute(ctx);
+            if (rightEval === true) {
+                return true;
+            }
+            else if (rightEval == null || leftEval == null) {
+                return null;
+            }
+            else {
+                return false;
+            }
         }
     };
     ThreeValuedLogic.or = function () {
@@ -6470,7 +6506,11 @@ var And = /** @class */ (function (_super) {
         return _super.call(this, json) || this;
     }
     And.prototype.exec = function (ctx) {
-        return datatypes_1.ThreeValuedLogic.and.apply(datatypes_1.ThreeValuedLogic, this.execArgs(ctx));
+        if (this.args == null || this.args.length !== 2) {
+            throw new Error('Invalid arguments for And expression.');
+        }
+        return datatypes_1.ThreeValuedLogic.andShortCircuit(this.args[0], this.args[1], ctx);
+        // return ThreeValuedLogic.and(...this.execArgs(ctx));
     };
     return And;
 }(expression_1.Expression));
@@ -6481,7 +6521,11 @@ var Or = /** @class */ (function (_super) {
         return _super.call(this, json) || this;
     }
     Or.prototype.exec = function (ctx) {
-        return datatypes_1.ThreeValuedLogic.or.apply(datatypes_1.ThreeValuedLogic, this.execArgs(ctx));
+        if (this.args == null || this.args.length !== 2) {
+            throw new Error('Invalid arguments for And expression.');
+        }
+        return datatypes_1.ThreeValuedLogic.orShortCircuit(this.args[0], this.args[1], ctx);
+        //return ThreeValuedLogic.or(...this.execArgs(ctx));
     };
     return Or;
 }(expression_1.Expression));
