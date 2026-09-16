@@ -128,7 +128,8 @@ function codesAreEquivalent(code1: any, code2: any) {
 }
 
 function getClassOfObjects(object1: any, object2: any) {
-  return [object1, object2].map(obj => ({}.toString.call(obj)));
+  // Avoid array creation and .map closure allocation for performance
+  return [Object.prototype.toString.call(object1), Object.prototype.toString.call(object2)];
 }
 
 function compareEveryItemInArrays(array1: any[], array2: any[], comparisonFunction: any) {
