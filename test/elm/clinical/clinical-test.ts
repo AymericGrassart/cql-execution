@@ -547,6 +547,7 @@ describe('CalculateAgeAt', () => {
 
   it('should convert date to DateTime, but give an Uncertainty since the timeZoneOffset is not passed in and therefore equal to the timezone of the evaluation request timestamp', async function () {
     setup(this, data, [p6]);
+    this.ctx.executionDateTime = new DT.DateTime(2024, 1, 1, 0, 0, 0, 0, -5);
     // Change it to the Date class
     this.ctx.patient.birthDate = new DT.Date(2005, 12, 31);
 
