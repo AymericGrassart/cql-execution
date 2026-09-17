@@ -1,5 +1,11 @@
 import { Uncertainty } from '../datatypes/datatypes';
 
+// Module-level singletons for performance optimization
+const objectToString = Object.prototype.toString;
+// Reuse Intl.Collator instance to avoid expensive re-instantiation on every string equivalence check
+const enCollator = new Intl.Collator('en', { sensitivity: 'base' });
+const WHITESPACE_REGEX = /\s/g;
+
 function areNumbers(a: any, b: any) {
   return typeof a === 'number' && typeof b === 'number';
 }
@@ -109,9 +115,10 @@ export function equivalent(a: any, b: any) {
       // Make sure b is also a string
       if (bClass === '[object String]') {
         // String equivalence is case- and locale insensitive
-        a = a.replace(/\s/g, ' ');
-        b = b.replace(/\s/g, ' ');
-        return a.localeCompare(b, 'en', { sensitivity: 'base' }) === 0;
+        // Use module-scoped Intl.Collator and RegExp to avoid per-call allocation overhead
+        a = a.replace(WHITESPACE_REGEX, ' ');
+        b = b.replace(WHITESPACE_REGEX, ' ');
+        return enCollator.compare(a, b) === 0;
       }
       break;
   }
@@ -127,8 +134,9 @@ function codesAreEquivalent(code1: any, code2: any) {
   return code1.hasMatch(code2);
 }
 
-function getClassOfObjects(object1: any, object2: any) {
-  return [object1, object2].map(obj => ({}.toString.call(obj)));
+function getClassOfObjects(object1: any, object2: any): [string, string] {
+  // Use cached Object.prototype.toString to avoid allocating empty object literals
+  return [objectToString.call(object1), objectToString.call(object2)];
 }
 
 function compareEveryItemInArrays(array1: any[], array2: any[], comparisonFunction: any) {
@@ -183,7 +191,7 @@ function getKeysFromObject(object: any) {
 }
 
 function isFunction(input: any) {
-  return input instanceof Function || {}.toString.call(input) === '[object Function]';
+  return input instanceof Function || objectToString.call(input) === '[object Function]';
 }
 
 export function equals(a: any, b: any) {
@@ -234,8 +242,13 @@ export function equals(a: any, b: any) {
       // Compare the ms since epoch
       return a.getTime() === b.getTime();
     case '[object RegExp]':
-      // Compare the components of the regular expression
-      return ['source', 'global', 'ignoreCase', 'multiline'].every(p => a[p] === b[p]);
+      // Compare the components of the regular expression directly to avoid array/closure allocation
+      return (
+        a.source === b.source &&
+        a.global === b.global &&
+        a.ignoreCase === b.ignoreCase &&
+        a.multiline === b.multiline
+      );
     case '[object Array]':
       if (
         a.indexOf(null) >= 0 ||

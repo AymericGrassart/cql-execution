@@ -115,26 +115,26 @@ describe('ImmutableUtil Tests', () => {
     equals(u3, u4).should.be.false();
     equals(u4, u5).should.be.false();
 
-    should(equals(u2, u6)).be.null();
-    should(equals(u2, u7)).be.null();
-    should(equals(u3, u7)).be.null();
-    should(equals(u4, u6)).be.null();
-    should(equals(u4, u7)).be.null();
-    should(equals(u5, u6)).be.null();
-    should(equals(u5, u7)).be.null();
-    should(equals(u6, u7)).be.null();
-    should(equals(u7, u6)).be.null();
+    should.equal(equals(u2, u6), null);
+    should.equal(equals(u2, u7), null);
+    should.equal(equals(u3, u7), null);
+    should.equal(equals(u4, u6), null);
+    should.equal(equals(u4, u7), null);
+    should.equal(equals(u5, u6), null);
+    should.equal(equals(u5, u7), null);
+    should.equal(equals(u6, u7), null);
+    should.equal(equals(u7, u6), null);
 
-    should(equals(u4, u8)).be.null();
-    should(equals(u5, u8)).be.null();
-    should(equals(u6, u8)).be.null();
-    should(equals(u7, u8)).be.null();
-    should(equals(u8, u4)).be.null();
-    should(equals(u8, u5)).be.null();
-    should(equals(u8, u6)).be.null();
-    should(equals(u8, u7)).be.null();
+    should.equal(equals(u4, u8), null);
+    should.equal(equals(u5, u8), null);
+    should.equal(equals(u6, u8), null);
+    should.equal(equals(u7, u8), null);
+    should.equal(equals(u8, u4), null);
+    should.equal(equals(u8, u5), null);
+    should.equal(equals(u8, u6), null);
+    should.equal(equals(u8, u7), null);
 
-    equals(u5, u9).should.be.false();
+    should.equal(equals(u5, u9), null);
     equals(u9, u10).should.be.true();
 
     // Immutable
@@ -360,8 +360,8 @@ describe('ImmutableUtil Tests', () => {
     const ic3 = toNormalizedKey(c3);
 
     // Classic behavior
-    should(equals(c1, c2)).be.null();
-    should(equals(c1, c3)).be.null();
+    should.equal(equals(c1, c2), null);
+    should.equal(equals(c1, c3), null);
 
     // The classic behavior is incorrect for List except, intersect, and distinct operations
     // For each, null should be handled as equals according to spec.  Here's the quote from CQL Appendix B:
