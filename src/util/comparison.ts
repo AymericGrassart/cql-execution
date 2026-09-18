@@ -127,8 +127,9 @@ function codesAreEquivalent(code1: any, code2: any) {
   return code1.hasMatch(code2);
 }
 
+// Fast object class retriever without array allocation/closure overhead
 function getClassOfObjects(object1: any, object2: any) {
-  return [object1, object2].map(obj => ({}.toString.call(obj)));
+  return [{}.toString.call(object1), {}.toString.call(object2)];
 }
 
 function compareEveryItemInArrays(array1: any[], array2: any[], comparisonFunction: any) {
@@ -150,40 +151,54 @@ function classesEqual(object1: any, object2: any) {
 }
 
 function deepCompareKeysAndValues(a: any, b: any, comparisonFunction: any) {
-  let finalComparisonResult;
   const aKeys = getKeysFromObject(a).sort();
   const bKeys = getKeysFromObject(b).sort();
-  // Array.every() will only return true or false, so set a flag for if we should return null
+
+  if (aKeys.length !== bKeys.length) {
+    return false;
+  }
+
   let shouldReturnNull = false;
-  // Check if both arrays of keys are the same length and key names match
-  if (aKeys.length === bKeys.length && aKeys.every((value, index) => value === bKeys[index])) {
-    finalComparisonResult = aKeys.every(key => {
-      // if both are null we should return true to satisfy ignoring empty values in tuples
-      if (a[key] == null && b[key] == null) {
-        return true;
-      }
-      const comparisonResult = comparisonFunction(a[key], b[key]);
-      if (comparisonResult === null) {
-        shouldReturnNull = true;
-      }
-      return comparisonResult;
-    });
-  } else {
-    finalComparisonResult = false;
+
+  // Single loop over keys to check key equality and evaluate comparisonFunction
+  for (let i = 0; i < aKeys.length; i++) {
+    const key = aKeys[i];
+    if (key !== bKeys[i]) {
+      return false;
+    }
+    // If both are null, ignore in tuple comparison
+    if (a[key] == null && b[key] == null) {
+      continue;
+    }
+    const comparisonResult = comparisonFunction(a[key], b[key]);
+    if (comparisonResult === null) {
+      shouldReturnNull = true;
+    } else if (!comparisonResult) {
+      return false;
+    }
   }
 
   if (shouldReturnNull) {
     return null;
   }
-  return finalComparisonResult;
+  return true;
 }
 
+// Fast non-function key extractor avoiding Array.filter overhead
 function getKeysFromObject(object: any) {
-  return Object.keys(object).filter(k => !isFunction(object[k]));
+  const keys = Object.keys(object);
+  const nonFunctionKeys: string[] = [];
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i];
+    if (!isFunction(object[k])) {
+      nonFunctionKeys.push(k);
+    }
+  }
+  return nonFunctionKeys;
 }
 
 function isFunction(input: any) {
-  return input instanceof Function || {}.toString.call(input) === '[object Function]';
+  return typeof input === 'function';
 }
 
 export function equals(a: any, b: any) {
