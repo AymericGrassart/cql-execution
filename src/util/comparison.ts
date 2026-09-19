@@ -127,8 +127,8 @@ function codesAreEquivalent(code1: any, code2: any) {
   return code1.hasMatch(code2);
 }
 
-function getClassOfObjects(object1: any, object2: any) {
-  return [object1, object2].map(obj => ({}.toString.call(obj)));
+function getClassOfObjects(object1: any, object2: any): [string, string] {
+  return [Object.prototype.toString.call(object1), Object.prototype.toString.call(object2)];
 }
 
 function compareEveryItemInArrays(array1: any[], array2: any[], comparisonFunction: any) {
@@ -183,7 +183,7 @@ function getKeysFromObject(object: any) {
 }
 
 function isFunction(input: any) {
-  return input instanceof Function || {}.toString.call(input) === '[object Function]';
+  return input instanceof Function || Object.prototype.toString.call(input) === '[object Function]';
 }
 
 export function equals(a: any, b: any) {
@@ -192,13 +192,25 @@ export function equals(a: any, b: any) {
     return null;
   }
 
+  // Fast path: primitive strict equality (strings, numbers, booleans, identical references)
+  if (a === b) {
+    return true;
+  }
+
+  // Fast path: if both are primitive types and not equal (a !== b), return false
+  const typeA = typeof a;
+  const typeB = typeof b;
+  if (typeA !== 'object' && typeA !== 'function' && typeB !== 'object' && typeB !== 'function') {
+    return false;
+  }
+
   // If one is a Quantity, use the Quantity equals function
-  if (a && a.isQuantity) {
+  if (a.isQuantity) {
     return a.equals(b);
   }
 
   // If one is a Ratio, use the ratio equals function
-  if (a && a.isRatio) {
+  if (a.isRatio) {
     return a.equals(b);
   }
 
@@ -212,15 +224,6 @@ export function equals(a: any, b: any) {
   // Use overloaded 'equals' function if it is available
   if (typeof a.equals === 'function') {
     return a.equals(b);
-  }
-
-  // Return true of the objects are primitives and are strictly equal
-  if (
-    (typeof a === typeof b && typeof a === 'string') ||
-    typeof a === 'number' ||
-    typeof a === 'boolean'
-  ) {
-    return a === b;
   }
 
   // Return false if they are instances of different classes
