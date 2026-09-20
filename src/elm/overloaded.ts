@@ -51,8 +51,9 @@ export class NotEqual extends Expression {
     if (args[0] == null || args[1] == null) {
       return null;
     }
+    // Reuse evaluated args to avoid re-evaluating expressions
     // @ts-ignore
-    return ThreeValuedLogic.not(equals(...(await this.execArgs(ctx))));
+    return ThreeValuedLogic.not(equals(...args));
   }
 }
 
