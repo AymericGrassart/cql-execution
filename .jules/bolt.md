@@ -1,0 +1,3 @@
+## 2025-05-18 - Avoid array sorting and allocations in object equality comparisons
+**Learning:** `deepCompareKeysAndValues` and `getClassOfObjects` in `src/util/comparison.ts` previously sorted object key arrays ($O(N \log N)$), used array `.map()`/`.filter()`/`.every()` callbacks, and instantiated throwaway `{}` objects for `.toString()` checks. In hot path comparison functions called heavily during execution, replacing these with direct loops and `Object.prototype.hasOwnProperty.call` yields a ~2x performance speedup without altering comparison semantics or null/tuple handling.
+**Action:** When comparing objects or keys in hot paths, check key existence directly via `hasOwnProperty` and standard loops instead of sorting key arrays or mapping arrays.
