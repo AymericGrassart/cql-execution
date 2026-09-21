@@ -127,8 +127,8 @@ function codesAreEquivalent(code1: any, code2: any) {
   return code1.hasMatch(code2);
 }
 
-function getClassOfObjects(object1: any, object2: any) {
-  return [object1, object2].map(obj => ({}.toString.call(obj)));
+function getClassOfObjects(object1: any, object2: any): [string, string] {
+  return [Object.prototype.toString.call(object1), Object.prototype.toString.call(object2)];
 }
 
 function compareEveryItemInArrays(array1: any[], array2: any[], comparisonFunction: any) {
@@ -149,41 +149,50 @@ function classesEqual(object1: any, object2: any) {
   return object2 instanceof object1.constructor && object1 instanceof object2.constructor;
 }
 
+// Optimized object key & value comparison to avoid sorting arrays, unnecessary allocations, and repeated filtering
 function deepCompareKeysAndValues(a: any, b: any, comparisonFunction: any) {
-  let finalComparisonResult;
-  const aKeys = getKeysFromObject(a).sort();
-  const bKeys = getKeysFromObject(b).sort();
-  // Array.every() will only return true or false, so set a flag for if we should return null
-  let shouldReturnNull = false;
-  // Check if both arrays of keys are the same length and key names match
-  if (aKeys.length === bKeys.length && aKeys.every((value, index) => value === bKeys[index])) {
-    finalComparisonResult = aKeys.every(key => {
-      // if both are null we should return true to satisfy ignoring empty values in tuples
-      if (a[key] == null && b[key] == null) {
-        return true;
-      }
-      const comparisonResult = comparisonFunction(a[key], b[key]);
-      if (comparisonResult === null) {
-        shouldReturnNull = true;
-      }
-      return comparisonResult;
-    });
-  } else {
-    finalComparisonResult = false;
+  const aKeys = getKeysFromObject(a);
+  const bKeys = getKeysFromObject(b);
+
+  if (aKeys.length !== bKeys.length) {
+    return false;
   }
 
-  if (shouldReturnNull) {
-    return null;
+  let shouldReturnNull = false;
+
+  for (let i = 0; i < aKeys.length; i++) {
+    const key = aKeys[i];
+    // Property must exist in b
+    if (!Object.prototype.hasOwnProperty.call(b, key)) {
+      return false;
+    }
+
+    // if both are null we should return true to satisfy ignoring empty values in tuples
+    if (a[key] == null && b[key] == null) {
+      continue;
+    }
+
+    const comparisonResult = comparisonFunction(a[key], b[key]);
+    if (comparisonResult === null) {
+      shouldReturnNull = true;
+    } else if (!comparisonResult) {
+      return false;
+    }
   }
-  return finalComparisonResult;
+
+  return shouldReturnNull ? null : true;
 }
 
 function getKeysFromObject(object: any) {
-  return Object.keys(object).filter(k => !isFunction(object[k]));
-}
-
-function isFunction(input: any) {
-  return input instanceof Function || {}.toString.call(input) === '[object Function]';
+  const keys = Object.keys(object);
+  const nonFuncKeys: string[] = [];
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i];
+    if (typeof object[k] !== 'function') {
+      nonFuncKeys.push(k);
+    }
+  }
+  return nonFuncKeys;
 }
 
 export function equals(a: any, b: any) {
