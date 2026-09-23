@@ -162,7 +162,8 @@ export class Flatten extends Expression {
   async exec(ctx: Context) {
     const arg = await this.execArgs(ctx);
     if (typeIsArray(arg) && (arg as any[]).every(x => typeIsArray(x))) {
-      return (arg as any[]).reduce((x, y) => x.concat(y), []);
+      // Optimization: use flat(1) instead of reduce with concat to avoid O(N^2) array copying overhead
+      return (arg as any[]).flat(1);
     } else {
       return arg;
     }
@@ -184,23 +185,20 @@ export class Distinct extends Expression {
 }
 
 export const toDistinctList = (list: unknown[]): unknown[] => {
-  const list_keys = list.map(toNormalizedKey);
   const set = Immutable.Set<NormalizedKey>().asMutable();
   const distinct: unknown[] = [];
 
   set.withMutations(y => {
-    list_keys.forEach((key, i) => {
-      // Check set size
-      const setSize = y.count();
-
-      // Attempt to insert
-      y.add(key);
-
-      // If inserted, then size will increase; push to distinct
-      if (y.count() > setSize) {
-        distinct.push(list[i]);
+    for (let i = 0; i < list.length; i++) {
+      const item = list[i];
+      const key = toNormalizedKey(item);
+      // Optimization: use y.has(key) instead of calling y.count() twice per element,
+      // which eliminates traversing the Immutable.Set tree multiple times per item.
+      if (!y.has(key)) {
+        y.add(key);
+        distinct.push(item);
       }
-    });
+    }
   });
 
   return distinct;
