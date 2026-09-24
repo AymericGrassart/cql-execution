@@ -162,7 +162,8 @@ export class Flatten extends Expression {
   async exec(ctx: Context) {
     const arg = await this.execArgs(ctx);
     if (typeIsArray(arg) && (arg as any[]).every(x => typeIsArray(x))) {
-      return (arg as any[]).reduce((x, y) => x.concat(y), []);
+      // Use native Array.prototype.flat() for O(N) performance instead of O(N^2) reduce+concat
+      return (arg as any[]).flat();
     } else {
       return arg;
     }
