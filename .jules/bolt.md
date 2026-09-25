@@ -1,0 +1,3 @@
+## 2025-05-18 - Avoid `Array.prototype.shift()` in recursive/iterative sorting algorithms
+**Learning:** `Array.prototype.shift()` mutates arrays and operates in O(N) linear time because all remaining elements must be re-indexed in memory. In recursive sorting functions like `mergeSort`, calling `shift()` repeatedly degrades merge step efficiency. Using index pointers (`i`, `j`, `k`) over pre-allocated arrays avoids re-indexing overhead entirely.
+**Action:** Always prefer index pointer traversal (`i`, `j`) and pre-allocation when merging sorted arrays or processing lists in hot execution loops.
