@@ -1,0 +1,3 @@
+## 2025-02-20 - Immutable Set duplicate checking and primitive equality hot paths
+**Learning:** In `cql-execution`, `toDistinctList` called `Immutable.Set.count()` twice per element inside `withMutations`, causing recalculation/reading of set size for every list item. `set.has(key)` is ~46% faster for checking set membership. Additionally, `equals` compared primitives through fallback checks that triggered property lookups for CQL types (`isQuantity`, `isRatio`, `equals`).
+**Action:** Use `!set.has(key)` for set deduplication instead of comparing set size before and after insertion. Fast-path primitive equality checks at the start of `equals()` to avoid property lookups on JS primitives.

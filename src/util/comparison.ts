@@ -127,8 +127,11 @@ function codesAreEquivalent(code1: any, code2: any) {
   return code1.hasMatch(code2);
 }
 
+const objectToString = Object.prototype.toString;
+
 function getClassOfObjects(object1: any, object2: any) {
-  return [object1, object2].map(obj => ({}.toString.call(obj)));
+  // Avoid array allocation and mapping closure
+  return [objectToString.call(object1), objectToString.call(object2)];
 }
 
 function compareEveryItemInArrays(array1: any[], array2: any[], comparisonFunction: any) {
@@ -153,10 +156,13 @@ function deepCompareKeysAndValues(a: any, b: any, comparisonFunction: any) {
   let finalComparisonResult;
   const aKeys = getKeysFromObject(a).sort();
   const bKeys = getKeysFromObject(b).sort();
+  // Return early if key lengths differ before checking every key
+  if (aKeys.length !== bKeys.length) {
+    return false;
+  }
   // Array.every() will only return true or false, so set a flag for if we should return null
   let shouldReturnNull = false;
-  // Check if both arrays of keys are the same length and key names match
-  if (aKeys.length === bKeys.length && aKeys.every((value, index) => value === bKeys[index])) {
+  if (aKeys.every((value, index) => value === bKeys[index])) {
     finalComparisonResult = aKeys.every(key => {
       // if both are null we should return true to satisfy ignoring empty values in tuples
       if (a[key] == null && b[key] == null) {
@@ -179,17 +185,21 @@ function deepCompareKeysAndValues(a: any, b: any, comparisonFunction: any) {
 }
 
 function getKeysFromObject(object: any) {
-  return Object.keys(object).filter(k => !isFunction(object[k]));
-}
-
-function isFunction(input: any) {
-  return input instanceof Function || {}.toString.call(input) === '[object Function]';
+  return Object.keys(object).filter(k => typeof object[k] !== 'function');
 }
 
 export function equals(a: any, b: any) {
   // Handle null cases first: spec says if either is null, return null
   if (a == null || b == null) {
     return null;
+  }
+
+  // Fast path for same-type primitive equality (numbers, strings, booleans)
+  // to avoid redundant property lookups and instanceof checks
+  const typeA = typeof a;
+  const typeB = typeof b;
+  if (typeA === typeB && (typeA === 'number' || typeA === 'string' || typeA === 'boolean')) {
+    return a === b;
   }
 
   // If one is a Quantity, use the Quantity equals function
