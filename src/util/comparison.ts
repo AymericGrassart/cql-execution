@@ -89,7 +89,7 @@ export function equivalent(a: any, b: any) {
   }
 
   // Quantity equivalence is the same as Quantity equality
-  if (a.isQuantity) {
+  if (a && a.isQuantity) {
     return a.equals(b);
   }
 
@@ -98,37 +98,44 @@ export function equivalent(a: any, b: any) {
     return a.equivalent(b);
   }
 
-  const [aClass, bClass] = getClassOfObjects(a, b);
+  const typeA = typeof a;
+  const typeB = typeof b;
 
-  switch (aClass) {
-    case '[object Array]':
+  if (typeA !== typeB) {
+    return false;
+  }
+
+  if (typeA === 'string') {
+    // String equivalence is case- and locale insensitive
+    a = a.replace(/\s/g, ' ');
+    b = b.replace(/\s/g, ' ');
+    return a.localeCompare(b, 'en', { sensitivity: 'base' }) === 0;
+  }
+
+  if (typeA === 'object') {
+    const aClass = Object.prototype.toString.call(a);
+    const bClass = Object.prototype.toString.call(b);
+    if (aClass !== bClass) {
+      return false;
+    }
+
+    if (aClass === '[object Array]') {
       return compareEveryItemInArrays(a, b, equivalent);
-    case '[object Object]':
+    }
+    if (aClass === '[object Object]') {
       return compareObjects(a, b, equivalent);
-    case '[object String]':
-      // Make sure b is also a string
-      if (bClass === '[object String]') {
-        // String equivalence is case- and locale insensitive
-        a = a.replace(/\s/g, ' ');
-        b = b.replace(/\s/g, ' ');
-        return a.localeCompare(b, 'en', { sensitivity: 'base' }) === 0;
-      }
-      break;
+    }
   }
 
   return equals(a, b);
 }
 
 function isCode(object: any) {
-  return object.hasMatch && typeof object.hasMatch === 'function';
+  return object && typeof object.hasMatch === 'function';
 }
 
 function codesAreEquivalent(code1: any, code2: any) {
   return code1.hasMatch(code2);
-}
-
-function getClassOfObjects(object1: any, object2: any) {
-  return [object1, object2].map(obj => ({}.toString.call(obj)));
 }
 
 function compareEveryItemInArrays(array1: any[], array2: any[], comparisonFunction: any) {
@@ -151,12 +158,20 @@ function classesEqual(object1: any, object2: any) {
 
 function deepCompareKeysAndValues(a: any, b: any, comparisonFunction: any) {
   let finalComparisonResult;
-  const aKeys = getKeysFromObject(a).sort();
-  const bKeys = getKeysFromObject(b).sort();
+  const aKeys = getKeysFromObject(a);
+  const bKeys = getKeysFromObject(b);
+
+  if (aKeys.length !== bKeys.length) {
+    return false;
+  }
+
+  aKeys.sort();
+  bKeys.sort();
+
   // Array.every() will only return true or false, so set a flag for if we should return null
   let shouldReturnNull = false;
-  // Check if both arrays of keys are the same length and key names match
-  if (aKeys.length === bKeys.length && aKeys.every((value, index) => value === bKeys[index])) {
+  // Check if both arrays of keys match
+  if (aKeys.every((value, index) => value === bKeys[index])) {
     finalComparisonResult = aKeys.every(key => {
       // if both are null we should return true to satisfy ignoring empty values in tuples
       if (a[key] == null && b[key] == null) {
@@ -179,11 +194,15 @@ function deepCompareKeysAndValues(a: any, b: any, comparisonFunction: any) {
 }
 
 function getKeysFromObject(object: any) {
-  return Object.keys(object).filter(k => !isFunction(object[k]));
-}
-
-function isFunction(input: any) {
-  return input instanceof Function || {}.toString.call(input) === '[object Function]';
+  const keys = Object.keys(object);
+  const result = [];
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i];
+    if (typeof object[k] !== 'function') {
+      result.push(k);
+    }
+  }
+  return result;
 }
 
 export function equals(a: any, b: any) {
@@ -214,17 +233,20 @@ export function equals(a: any, b: any) {
     return a.equals(b);
   }
 
-  // Return true of the objects are primitives and are strictly equal
-  if (
-    (typeof a === typeof b && typeof a === 'string') ||
-    typeof a === 'number' ||
-    typeof a === 'boolean'
-  ) {
+  // Return true if the objects are primitives and are strictly equal
+  const typeA = typeof a;
+  const typeB = typeof b;
+
+  if (typeA !== typeB) {
+    return false;
+  }
+
+  if (typeA === 'string' || typeA === 'number' || typeA === 'boolean') {
     return a === b;
   }
 
-  // Return false if they are instances of different classes
-  const [aClass, bClass] = getClassOfObjects(a, b);
+  const aClass = Object.prototype.toString.call(a);
+  const bClass = Object.prototype.toString.call(b);
   if (aClass !== bClass) {
     return false;
   }
@@ -235,7 +257,12 @@ export function equals(a: any, b: any) {
       return a.getTime() === b.getTime();
     case '[object RegExp]':
       // Compare the components of the regular expression
-      return ['source', 'global', 'ignoreCase', 'multiline'].every(p => a[p] === b[p]);
+      return (
+        a.source === b.source &&
+        a.global === b.global &&
+        a.ignoreCase === b.ignoreCase &&
+        a.multiline === b.multiline
+      );
     case '[object Array]':
       if (
         a.indexOf(null) >= 0 ||
