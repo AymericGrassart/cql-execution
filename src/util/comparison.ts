@@ -1,29 +1,25 @@
 import { Uncertainty } from '../datatypes/datatypes';
 
-function areNumbers(a: any, b: any) {
-  return typeof a === 'number' && typeof b === 'number';
-}
-
-function areStrings(a: any, b: any) {
-  return typeof a === 'string' && typeof b === 'string';
-}
-
-function areDateTimesOrQuantities(a: any, b: any) {
-  return (
-    (a && a.isDateTime && b && b.isDateTime) ||
-    (a && a.isDate && b && b.isDate) ||
-    (a && a.isQuantity && b && b.isQuantity)
-  );
-}
+// Performance optimization: Cache Intl.Collator for locale-insensitive string equivalence comparisons
+const enCollator = new Intl.Collator('en', { sensitivity: 'base' });
 
 function isUncertainty(x: any) {
   return x instanceof Uncertainty;
 }
 
 export function lessThan(a: any, b: any, precision?: any) {
-  if (areNumbers(a, b) || areStrings(a, b)) {
+  if (a == null || b == null) {
+    return null;
+  }
+  const typeA = typeof a;
+  const typeB = typeof b;
+  if ((typeA === 'number' && typeB === 'number') || (typeA === 'string' && typeB === 'string')) {
     return a < b;
-  } else if (areDateTimesOrQuantities(a, b)) {
+  } else if (
+    (a.isDateTime && b.isDateTime) ||
+    (a.isDate && b.isDate) ||
+    (a.isQuantity && b.isQuantity)
+  ) {
     return a.before(b, precision);
   } else if (isUncertainty(a)) {
     return a.lessThan(b);
@@ -35,9 +31,18 @@ export function lessThan(a: any, b: any, precision?: any) {
 }
 
 export function lessThanOrEquals(a: any, b: any, precision?: any) {
-  if (areNumbers(a, b) || areStrings(a, b)) {
+  if (a == null || b == null) {
+    return null;
+  }
+  const typeA = typeof a;
+  const typeB = typeof b;
+  if ((typeA === 'number' && typeB === 'number') || (typeA === 'string' && typeB === 'string')) {
     return a <= b;
-  } else if (areDateTimesOrQuantities(a, b)) {
+  } else if (
+    (a.isDateTime && b.isDateTime) ||
+    (a.isDate && b.isDate) ||
+    (a.isQuantity && b.isQuantity)
+  ) {
     return a.sameOrBefore(b, precision);
   } else if (isUncertainty(a)) {
     return a.lessThanOrEquals(b);
@@ -49,9 +54,18 @@ export function lessThanOrEquals(a: any, b: any, precision?: any) {
 }
 
 export function greaterThan(a: any, b: any, precision?: any) {
-  if (areNumbers(a, b) || areStrings(a, b)) {
+  if (a == null || b == null) {
+    return null;
+  }
+  const typeA = typeof a;
+  const typeB = typeof b;
+  if ((typeA === 'number' && typeB === 'number') || (typeA === 'string' && typeB === 'string')) {
     return a > b;
-  } else if (areDateTimesOrQuantities(a, b)) {
+  } else if (
+    (a.isDateTime && b.isDateTime) ||
+    (a.isDate && b.isDate) ||
+    (a.isQuantity && b.isQuantity)
+  ) {
     return a.after(b, precision);
   } else if (isUncertainty(a)) {
     return a.greaterThan(b);
@@ -63,9 +77,18 @@ export function greaterThan(a: any, b: any, precision?: any) {
 }
 
 export function greaterThanOrEquals(a: any, b: any, precision?: any) {
-  if (areNumbers(a, b) || areStrings(a, b)) {
+  if (a == null || b == null) {
+    return null;
+  }
+  const typeA = typeof a;
+  const typeB = typeof b;
+  if ((typeA === 'number' && typeB === 'number') || (typeA === 'string' && typeB === 'string')) {
     return a >= b;
-  } else if (areDateTimesOrQuantities(a, b)) {
+  } else if (
+    (a.isDateTime && b.isDateTime) ||
+    (a.isDate && b.isDate) ||
+    (a.isQuantity && b.isQuantity)
+  ) {
     return a.sameOrAfter(b, precision);
   } else if (isUncertainty(a)) {
     return a.greaterThanOrEquals(b);
@@ -76,12 +99,28 @@ export function greaterThanOrEquals(a: any, b: any, precision?: any) {
   }
 }
 
-export function equivalent(a: any, b: any) {
+export function equivalent(a: any, b: any): any {
   if (a == null && b == null) {
     return true;
   }
   if (a == null || b == null) {
     return false;
+  }
+
+  // Fast path: string primitives comparison
+  if (typeof a === 'string' && typeof b === 'string') {
+    if (a === b) {
+      return true;
+    }
+    // String equivalence is case- and locale insensitive, ignoring whitespace differences
+    const normA = a.replace(/\s/g, ' ');
+    const normB = b.replace(/\s/g, ' ');
+    return enCollator.compare(normA, normB) === 0;
+  }
+
+  // Fast path: primitive numbers or booleans
+  if (typeof a === typeof b && (typeof a === 'number' || typeof a === 'boolean')) {
+    return a === b;
   }
 
   if (isCode(a)) {
@@ -106,12 +145,10 @@ export function equivalent(a: any, b: any) {
     case '[object Object]':
       return compareObjects(a, b, equivalent);
     case '[object String]':
-      // Make sure b is also a string
       if (bClass === '[object String]') {
-        // String equivalence is case- and locale insensitive
-        a = a.replace(/\s/g, ' ');
-        b = b.replace(/\s/g, ' ');
-        return a.localeCompare(b, 'en', { sensitivity: 'base' }) === 0;
+        const normA = a.replace(/\s/g, ' ');
+        const normB = b.replace(/\s/g, ' ');
+        return enCollator.compare(normA, normB) === 0;
       }
       break;
   }
@@ -128,7 +165,7 @@ function codesAreEquivalent(code1: any, code2: any) {
 }
 
 function getClassOfObjects(object1: any, object2: any) {
-  return [object1, object2].map(obj => ({}.toString.call(obj)));
+  return [Object.prototype.toString.call(object1), Object.prototype.toString.call(object2)];
 }
 
 function compareEveryItemInArrays(array1: any[], array2: any[], comparisonFunction: any) {
@@ -183,7 +220,7 @@ function getKeysFromObject(object: any) {
 }
 
 function isFunction(input: any) {
-  return input instanceof Function || {}.toString.call(input) === '[object Function]';
+  return typeof input === 'function';
 }
 
 export function equals(a: any, b: any) {
@@ -192,13 +229,20 @@ export function equals(a: any, b: any) {
     return null;
   }
 
+  // Early fast path for primitives (strings, numbers, booleans)
+  const typeA = typeof a;
+  const typeB = typeof b;
+  if (typeA === typeB && (typeA === 'number' || typeA === 'boolean' || typeA === 'string')) {
+    return a === b;
+  }
+
   // If one is a Quantity, use the Quantity equals function
-  if (a && a.isQuantity) {
+  if (a.isQuantity) {
     return a.equals(b);
   }
 
   // If one is a Ratio, use the ratio equals function
-  if (a && a.isRatio) {
+  if (a.isRatio) {
     return a.equals(b);
   }
 
@@ -212,15 +256,6 @@ export function equals(a: any, b: any) {
   // Use overloaded 'equals' function if it is available
   if (typeof a.equals === 'function') {
     return a.equals(b);
-  }
-
-  // Return true of the objects are primitives and are strictly equal
-  if (
-    (typeof a === typeof b && typeof a === 'string') ||
-    typeof a === 'number' ||
-    typeof a === 'boolean'
-  ) {
-    return a === b;
   }
 
   // Return false if they are instances of different classes
