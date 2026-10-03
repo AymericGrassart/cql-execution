@@ -1,5 +1,8 @@
 import { Uncertainty } from '../datatypes/datatypes';
 
+// Cached Object.prototype.toString to avoid creating object literals `{}` on every call
+const objectToString = Object.prototype.toString;
+
 function areNumbers(a: any, b: any) {
   return typeof a === 'number' && typeof b === 'number';
 }
@@ -98,7 +101,8 @@ export function equivalent(a: any, b: any) {
     return a.equivalent(b);
   }
 
-  const [aClass, bClass] = getClassOfObjects(a, b);
+  const aClass = objectToString.call(a);
+  const bClass = objectToString.call(b);
 
   switch (aClass) {
     case '[object Array]':
@@ -127,15 +131,21 @@ function codesAreEquivalent(code1: any, code2: any) {
   return code1.hasMatch(code2);
 }
 
-function getClassOfObjects(object1: any, object2: any) {
-  return [object1, object2].map(obj => ({}.toString.call(obj)));
-}
-
+// Performance optimization: Avoid allocating array and closures per comparison
 function compareEveryItemInArrays(array1: any[], array2: any[], comparisonFunction: any) {
-  return (
-    array1.length === array2.length &&
-    array1.every((item, i) => comparisonFunction(item, array2[i]))
-  );
+  if (array1.length !== array2.length) {
+    return false;
+  }
+  let shouldReturnNull = false;
+  for (let i = 0; i < array1.length; i++) {
+    const comparisonResult = comparisonFunction(array1[i], array2[i]);
+    if (comparisonResult === null) {
+      shouldReturnNull = true;
+    } else if (!comparisonResult) {
+      return false;
+    }
+  }
+  return shouldReturnNull ? null : true;
 }
 
 function compareObjects(a: any, b: any, comparisonFunction: any) {
@@ -149,41 +159,57 @@ function classesEqual(object1: any, object2: any) {
   return object2 instanceof object1.constructor && object1 instanceof object2.constructor;
 }
 
+// Performance optimization: Fast iterative key and value comparison without .every() callback allocations
 function deepCompareKeysAndValues(a: any, b: any, comparisonFunction: any) {
-  let finalComparisonResult;
-  const aKeys = getKeysFromObject(a).sort();
-  const bKeys = getKeysFromObject(b).sort();
-  // Array.every() will only return true or false, so set a flag for if we should return null
+  const aKeys = getKeysFromObject(a);
+  const bKeys = getKeysFromObject(b);
+
+  if (aKeys.length !== bKeys.length) {
+    return false;
+  }
+
+  // Deterministically sort keys to ensure property insertion order does not affect 3-valued comparison logic
+  aKeys.sort();
+  bKeys.sort();
+  for (let i = 0; i < aKeys.length; i++) {
+    if (aKeys[i] !== bKeys[i]) {
+      return false;
+    }
+  }
+
   let shouldReturnNull = false;
-  // Check if both arrays of keys are the same length and key names match
-  if (aKeys.length === bKeys.length && aKeys.every((value, index) => value === bKeys[index])) {
-    finalComparisonResult = aKeys.every(key => {
-      // if both are null we should return true to satisfy ignoring empty values in tuples
-      if (a[key] == null && b[key] == null) {
-        return true;
-      }
-      const comparisonResult = comparisonFunction(a[key], b[key]);
-      if (comparisonResult === null) {
-        shouldReturnNull = true;
-      }
-      return comparisonResult;
-    });
-  } else {
-    finalComparisonResult = false;
+  for (let i = 0; i < aKeys.length; i++) {
+    const key = aKeys[i];
+    // if both are null we should return true to satisfy ignoring empty values in tuples
+    if (a[key] == null && b[key] == null) {
+      continue;
+    }
+    const comparisonResult = comparisonFunction(a[key], b[key]);
+    if (comparisonResult === null) {
+      shouldReturnNull = true;
+      break;
+    } else if (!comparisonResult) {
+      return false;
+    }
   }
 
   if (shouldReturnNull) {
     return null;
   }
-  return finalComparisonResult;
+  return true;
 }
 
+// Performance optimization: Avoid .filter() callback allocation and isFunction overhead
 function getKeysFromObject(object: any) {
-  return Object.keys(object).filter(k => !isFunction(object[k]));
-}
-
-function isFunction(input: any) {
-  return input instanceof Function || {}.toString.call(input) === '[object Function]';
+  const keys = Object.keys(object);
+  const result: string[] = [];
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    if (typeof object[key] !== 'function') {
+      result.push(key);
+    }
+  }
+  return result;
 }
 
 export function equals(a: any, b: any) {
@@ -214,7 +240,7 @@ export function equals(a: any, b: any) {
     return a.equals(b);
   }
 
-  // Return true of the objects are primitives and are strictly equal
+  // Return true if the objects are primitives and are strictly equal
   if (
     (typeof a === typeof b && typeof a === 'string') ||
     typeof a === 'number' ||
@@ -224,7 +250,8 @@ export function equals(a: any, b: any) {
   }
 
   // Return false if they are instances of different classes
-  const [aClass, bClass] = getClassOfObjects(a, b);
+  const aClass = objectToString.call(a);
+  const bClass = objectToString.call(b);
   if (aClass !== bClass) {
     return false;
   }
@@ -235,7 +262,12 @@ export function equals(a: any, b: any) {
       return a.getTime() === b.getTime();
     case '[object RegExp]':
       // Compare the components of the regular expression
-      return ['source', 'global', 'ignoreCase', 'multiline'].every(p => a[p] === b[p]);
+      return (
+        a.source === b.source &&
+        a.global === b.global &&
+        a.ignoreCase === b.ignoreCase &&
+        a.multiline === b.multiline
+      );
     case '[object Array]':
       if (
         a.indexOf(null) >= 0 ||
