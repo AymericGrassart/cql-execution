@@ -1,0 +1,3 @@
+## 2025-02-18 - Fast equality and object class checking in CQL comparison
+**Learning:** `getClassOfObjects` previously allocated temporary arrays and invoked `{}.toString.call(obj)` inside `.map()`, creating heap overhead on hot comparison loops (`equals` and `equivalent`). Caching `Object.prototype.toString` at module level and checking primitive types (`string`, `number`, `boolean`) before accessing properties like `.isQuantity` avoids property lookups and garbage collection overhead on primitive evaluations.
+**Action:** Always check primitive types first before object property lookups in generic utility functions called millions of times.
