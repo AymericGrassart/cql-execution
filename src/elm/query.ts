@@ -320,15 +320,24 @@ export class QueryLetRef extends AliasRef {
 
 // cartesianProductOf function based on Chris West's function:
 // https://cwestblog.com/2011/05/02/cartesian-product-of-multiple-arrays/
-function cartesianProductOf(sources: any[]) {
+// Optimized to fast-path single-source queries (avoiding unnecessary array allocations and concat calls)
+// and use imperative loops with spread syntax for multi-source combinations.
+function cartesianProductOf(sources: any[][]) {
+  if (sources.length === 0) {
+    return [[]];
+  }
+  if (sources.length === 1) {
+    return sources[0].map(x => [x]);
+  }
   return sources.reduce(
-    (a: any[], b: any[]) => {
-      const ret: any[] = [];
-      a.forEach(a => {
-        b.forEach(b => {
-          ret.push(a.concat([b]));
-        });
-      });
+    (a: any[][], b: any[]) => {
+      const ret: any[][] = [];
+      for (let i = 0; i < a.length; i++) {
+        const a_item = a[i];
+        for (let j = 0; j < b.length; j++) {
+          ret.push([...a_item, b[j]]);
+        }
+      }
       return ret;
     },
     [[]]
