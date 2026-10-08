@@ -149,33 +149,42 @@ function classesEqual(object1: any, object2: any) {
   return object2 instanceof object1.constructor && object1 instanceof object2.constructor;
 }
 
+// Fast optimization: Compare object keys and values cleanly avoiding unnecessary array allocations (.sort)
 function deepCompareKeysAndValues(a: any, b: any, comparisonFunction: any) {
-  let finalComparisonResult;
-  const aKeys = getKeysFromObject(a).sort();
-  const bKeys = getKeysFromObject(b).sort();
-  // Array.every() will only return true or false, so set a flag for if we should return null
   let shouldReturnNull = false;
-  // Check if both arrays of keys are the same length and key names match
-  if (aKeys.length === bKeys.length && aKeys.every((value, index) => value === bKeys[index])) {
-    finalComparisonResult = aKeys.every(key => {
-      // if both are null we should return true to satisfy ignoring empty values in tuples
-      if (a[key] == null && b[key] == null) {
-        return true;
-      }
-      const comparisonResult = comparisonFunction(a[key], b[key]);
-      if (comparisonResult === null) {
-        shouldReturnNull = true;
-      }
-      return comparisonResult;
-    });
-  } else {
-    finalComparisonResult = false;
+  const aKeys = getKeysFromObject(a);
+  const bKeys = getKeysFromObject(b);
+
+  if (aKeys.length !== bKeys.length) {
+    return false;
+  }
+
+  for (let i = 0; i < aKeys.length; i++) {
+    const key = aKeys[i];
+    if (!Object.prototype.hasOwnProperty.call(b, key)) {
+      return false;
+    }
+
+    const valA = a[key];
+    const valB = b[key];
+
+    // if both are null/undefined we should return true to satisfy ignoring empty values in tuples
+    if (valA == null && valB == null) {
+      continue;
+    }
+
+    const comparisonResult = comparisonFunction(valA, valB);
+    if (comparisonResult === null) {
+      shouldReturnNull = true;
+    } else if (!comparisonResult) {
+      return false;
+    }
   }
 
   if (shouldReturnNull) {
     return null;
   }
-  return finalComparisonResult;
+  return true;
 }
 
 function getKeysFromObject(object: any) {
@@ -183,7 +192,7 @@ function getKeysFromObject(object: any) {
 }
 
 function isFunction(input: any) {
-  return input instanceof Function || {}.toString.call(input) === '[object Function]';
+  return typeof input === 'function' || input instanceof Function || {}.toString.call(input) === '[object Function]';
 }
 
 export function equals(a: any, b: any) {
