@@ -184,23 +184,21 @@ export class Distinct extends Expression {
 }
 
 export const toDistinctList = (list: unknown[]): unknown[] => {
-  const list_keys = list.map(toNormalizedKey);
   const set = Immutable.Set<NormalizedKey>().asMutable();
   const distinct: unknown[] = [];
 
   set.withMutations(y => {
-    list_keys.forEach((key, i) => {
-      // Check set size
-      const setSize = y.count();
+    for (let i = 0; i < list.length; i++) {
+      const item = list[i];
+      const key = toNormalizedKey(item);
 
-      // Attempt to insert
-      y.add(key);
-
-      // If inserted, then size will increase; push to distinct
-      if (y.count() > setSize) {
-        distinct.push(list[i]);
+      // Bolt Optimization: Check if key is present with O(1) y.has(key) before y.add(key)
+      // to avoid allocating list_keys array up-front and calling y.count() twice per item.
+      if (!y.has(key)) {
+        y.add(key);
+        distinct.push(item);
       }
-    });
+    }
   });
 
   return distinct;
