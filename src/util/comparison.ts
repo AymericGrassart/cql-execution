@@ -1,19 +1,7 @@
 import { Uncertainty } from '../datatypes/datatypes';
 
-function areNumbers(a: any, b: any) {
-  return typeof a === 'number' && typeof b === 'number';
-}
-
-function areStrings(a: any, b: any) {
-  return typeof a === 'string' && typeof b === 'string';
-}
-
-function areDateTimesOrQuantities(a: any, b: any) {
-  return (
-    (a && a.isDateTime && b && b.isDateTime) ||
-    (a && a.isDate && b && b.isDate) ||
-    (a && a.isQuantity && b && b.isQuantity)
-  );
+function getClass(obj: any) {
+  return Object.prototype.toString.call(obj);
 }
 
 function isUncertainty(x: any) {
@@ -21,9 +9,18 @@ function isUncertainty(x: any) {
 }
 
 export function lessThan(a: any, b: any, precision?: any) {
-  if (areNumbers(a, b) || areStrings(a, b)) {
+  if (a == null || b == null) {
+    return null;
+  }
+  const typeA = typeof a;
+  const typeB = typeof b;
+  if ((typeA === 'number' && typeB === 'number') || (typeA === 'string' && typeB === 'string')) {
     return a < b;
-  } else if (areDateTimesOrQuantities(a, b)) {
+  } else if (
+    (a.isDateTime && b.isDateTime) ||
+    (a.isDate && b.isDate) ||
+    (a.isQuantity && b.isQuantity)
+  ) {
     return a.before(b, precision);
   } else if (isUncertainty(a)) {
     return a.lessThan(b);
@@ -35,9 +32,18 @@ export function lessThan(a: any, b: any, precision?: any) {
 }
 
 export function lessThanOrEquals(a: any, b: any, precision?: any) {
-  if (areNumbers(a, b) || areStrings(a, b)) {
+  if (a == null || b == null) {
+    return null;
+  }
+  const typeA = typeof a;
+  const typeB = typeof b;
+  if ((typeA === 'number' && typeB === 'number') || (typeA === 'string' && typeB === 'string')) {
     return a <= b;
-  } else if (areDateTimesOrQuantities(a, b)) {
+  } else if (
+    (a.isDateTime && b.isDateTime) ||
+    (a.isDate && b.isDate) ||
+    (a.isQuantity && b.isQuantity)
+  ) {
     return a.sameOrBefore(b, precision);
   } else if (isUncertainty(a)) {
     return a.lessThanOrEquals(b);
@@ -49,9 +55,18 @@ export function lessThanOrEquals(a: any, b: any, precision?: any) {
 }
 
 export function greaterThan(a: any, b: any, precision?: any) {
-  if (areNumbers(a, b) || areStrings(a, b)) {
+  if (a == null || b == null) {
+    return null;
+  }
+  const typeA = typeof a;
+  const typeB = typeof b;
+  if ((typeA === 'number' && typeB === 'number') || (typeA === 'string' && typeB === 'string')) {
     return a > b;
-  } else if (areDateTimesOrQuantities(a, b)) {
+  } else if (
+    (a.isDateTime && b.isDateTime) ||
+    (a.isDate && b.isDate) ||
+    (a.isQuantity && b.isQuantity)
+  ) {
     return a.after(b, precision);
   } else if (isUncertainty(a)) {
     return a.greaterThan(b);
@@ -63,9 +78,18 @@ export function greaterThan(a: any, b: any, precision?: any) {
 }
 
 export function greaterThanOrEquals(a: any, b: any, precision?: any) {
-  if (areNumbers(a, b) || areStrings(a, b)) {
+  if (a == null || b == null) {
+    return null;
+  }
+  const typeA = typeof a;
+  const typeB = typeof b;
+  if ((typeA === 'number' && typeB === 'number') || (typeA === 'string' && typeB === 'string')) {
     return a >= b;
-  } else if (areDateTimesOrQuantities(a, b)) {
+  } else if (
+    (a.isDateTime && b.isDateTime) ||
+    (a.isDate && b.isDate) ||
+    (a.isQuantity && b.isQuantity)
+  ) {
     return a.sameOrAfter(b, precision);
   } else if (isUncertainty(a)) {
     return a.greaterThanOrEquals(b);
@@ -84,6 +108,17 @@ export function equivalent(a: any, b: any) {
     return false;
   }
 
+  // Fast path for string equivalence
+  if (typeof a === 'string' && typeof b === 'string') {
+    if (a === b) {
+      return true;
+    }
+    // String equivalence is case- and locale insensitive, converting whitespace chars to spaces
+    const normA = /\s/.test(a) ? a.replace(/\s/g, ' ') : a;
+    const normB = /\s/.test(b) ? b.replace(/\s/g, ' ') : b;
+    return normA.localeCompare(normB, 'en', { sensitivity: 'base' }) === 0;
+  }
+
   if (isCode(a)) {
     return codesAreEquivalent(a, b);
   }
@@ -98,22 +133,13 @@ export function equivalent(a: any, b: any) {
     return a.equivalent(b);
   }
 
-  const [aClass, bClass] = getClassOfObjects(a, b);
+  const aClass = getClass(a);
 
   switch (aClass) {
     case '[object Array]':
       return compareEveryItemInArrays(a, b, equivalent);
     case '[object Object]':
       return compareObjects(a, b, equivalent);
-    case '[object String]':
-      // Make sure b is also a string
-      if (bClass === '[object String]') {
-        // String equivalence is case- and locale insensitive
-        a = a.replace(/\s/g, ' ');
-        b = b.replace(/\s/g, ' ');
-        return a.localeCompare(b, 'en', { sensitivity: 'base' }) === 0;
-      }
-      break;
   }
 
   return equals(a, b);
@@ -127,15 +153,17 @@ function codesAreEquivalent(code1: any, code2: any) {
   return code1.hasMatch(code2);
 }
 
-function getClassOfObjects(object1: any, object2: any) {
-  return [object1, object2].map(obj => ({}.toString.call(obj)));
-}
-
 function compareEveryItemInArrays(array1: any[], array2: any[], comparisonFunction: any) {
-  return (
-    array1.length === array2.length &&
-    array1.every((item, i) => comparisonFunction(item, array2[i]))
-  );
+  if (array1.length !== array2.length) {
+    return false;
+  }
+  for (let i = 0; i < array1.length; i++) {
+    const res = comparisonFunction(array1[i], array2[i]);
+    if (!res) {
+      return res;
+    }
+  }
+  return true;
 }
 
 function compareObjects(a: any, b: any, comparisonFunction: any) {
@@ -151,25 +179,48 @@ function classesEqual(object1: any, object2: any) {
 
 function deepCompareKeysAndValues(a: any, b: any, comparisonFunction: any) {
   let finalComparisonResult;
-  const aKeys = getKeysFromObject(a).sort();
-  const bKeys = getKeysFromObject(b).sort();
-  // Array.every() will only return true or false, so set a flag for if we should return null
+  const aKeys = getKeysFromObject(a);
+  const bKeys = getKeysFromObject(b);
+
+  if (aKeys.length !== bKeys.length) {
+    return false;
+  }
+
+  // Check if keys match in order (fast path for objects of identical structure)
+  let keysMatchInOrder = true;
+  for (let i = 0; i < aKeys.length; i++) {
+    if (aKeys[i] !== bKeys[i]) {
+      keysMatchInOrder = false;
+      break;
+    }
+  }
+
+  let orderedAKeys = aKeys;
+  if (!keysMatchInOrder) {
+    orderedAKeys = aKeys.slice().sort();
+    const sortedBKeys = bKeys.slice().sort();
+    for (let i = 0; i < orderedAKeys.length; i++) {
+      if (orderedAKeys[i] !== sortedBKeys[i]) {
+        return false;
+      }
+    }
+  }
+
   let shouldReturnNull = false;
-  // Check if both arrays of keys are the same length and key names match
-  if (aKeys.length === bKeys.length && aKeys.every((value, index) => value === bKeys[index])) {
-    finalComparisonResult = aKeys.every(key => {
-      // if both are null we should return true to satisfy ignoring empty values in tuples
-      if (a[key] == null && b[key] == null) {
-        return true;
-      }
-      const comparisonResult = comparisonFunction(a[key], b[key]);
-      if (comparisonResult === null) {
-        shouldReturnNull = true;
-      }
-      return comparisonResult;
-    });
-  } else {
-    finalComparisonResult = false;
+  finalComparisonResult = true;
+
+  for (let i = 0; i < orderedAKeys.length; i++) {
+    const key = orderedAKeys[i];
+    if (a[key] == null && b[key] == null) {
+      continue;
+    }
+    const comparisonResult = comparisonFunction(a[key], b[key]);
+    if (comparisonResult === null) {
+      shouldReturnNull = true;
+    } else if (!comparisonResult) {
+      finalComparisonResult = false;
+      break;
+    }
   }
 
   if (shouldReturnNull) {
@@ -179,11 +230,31 @@ function deepCompareKeysAndValues(a: any, b: any, comparisonFunction: any) {
 }
 
 function getKeysFromObject(object: any) {
-  return Object.keys(object).filter(k => !isFunction(object[k]));
+  const keys = Object.keys(object);
+  let hasFunc = false;
+  for (let i = 0; i < keys.length; i++) {
+    if (isFunction(object[keys[i]])) {
+      hasFunc = true;
+      break;
+    }
+  }
+  if (!hasFunc) {
+    return keys;
+  }
+  return keys.filter(k => !isFunction(object[k]));
 }
 
 function isFunction(input: any) {
-  return input instanceof Function || {}.toString.call(input) === '[object Function]';
+  return typeof input === 'function';
+}
+
+function arrayContainsNullOrUndefined(arr: any[]) {
+  for (let i = 0; i < arr.length; i++) {
+    if (arr[i] == null) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export function equals(a: any, b: any) {
@@ -193,12 +264,12 @@ export function equals(a: any, b: any) {
   }
 
   // If one is a Quantity, use the Quantity equals function
-  if (a && a.isQuantity) {
+  if (a.isQuantity) {
     return a.equals(b);
   }
 
   // If one is a Ratio, use the ratio equals function
-  if (a && a.isRatio) {
+  if (a.isRatio) {
     return a.equals(b);
   }
 
@@ -214,17 +285,19 @@ export function equals(a: any, b: any) {
     return a.equals(b);
   }
 
-  // Return true of the objects are primitives and are strictly equal
-  if (
-    (typeof a === typeof b && typeof a === 'string') ||
-    typeof a === 'number' ||
-    typeof a === 'boolean'
-  ) {
-    return a === b;
+  // Return true if the objects are primitives (number, string, boolean) and strictly equal
+  const typeA = typeof a;
+  const typeB = typeof b;
+  if (typeA === 'string' || typeA === 'number' || typeA === 'boolean') {
+    if (typeA === typeB) {
+      return a === b;
+    }
+    return false;
   }
 
   // Return false if they are instances of different classes
-  const [aClass, bClass] = getClassOfObjects(a, b);
+  const aClass = getClass(a);
+  const bClass = getClass(b);
   if (aClass !== bClass) {
     return false;
   }
@@ -235,14 +308,14 @@ export function equals(a: any, b: any) {
       return a.getTime() === b.getTime();
     case '[object RegExp]':
       // Compare the components of the regular expression
-      return ['source', 'global', 'ignoreCase', 'multiline'].every(p => a[p] === b[p]);
+      return (
+        a.source === b.source &&
+        a.global === b.global &&
+        a.ignoreCase === b.ignoreCase &&
+        a.multiline === b.multiline
+      );
     case '[object Array]':
-      if (
-        a.indexOf(null) >= 0 ||
-        a.indexOf(undefined) >= 0 ||
-        b.indexOf(null) >= 0 ||
-        b.indexOf(undefined) >= 0
-      ) {
+      if (arrayContainsNullOrUndefined(a) || arrayContainsNullOrUndefined(b)) {
         return null;
       }
       return compareEveryItemInArrays(a, b, equals);
