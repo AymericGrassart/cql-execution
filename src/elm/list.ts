@@ -184,24 +184,34 @@ export class Distinct extends Expression {
 }
 
 export const toDistinctList = (list: unknown[]): unknown[] => {
-  const list_keys = list.map(toNormalizedKey);
-  const set = Immutable.Set<NormalizedKey>().asMutable();
   const distinct: unknown[] = [];
+  let primitiveSet: Set<unknown> | null = null;
+  let immutableSet: Immutable.Set<NormalizedKey> | null = null;
 
-  set.withMutations(y => {
-    list_keys.forEach((key, i) => {
-      // Check set size
-      const setSize = y.count();
+  // Single-pass optimization: avoiding list.map allocation and utilizing native Set
+  // for primitive normalized keys (numbers, strings, booleans, null/undefined) for fast lookups.
+  for (let i = 0; i < list.length; i++) {
+    const item = list[i];
+    const key = toNormalizedKey(item);
 
-      // Attempt to insert
-      y.add(key);
-
-      // If inserted, then size will increase; push to distinct
-      if (y.count() > setSize) {
-        distinct.push(list[i]);
+    if (typeof key !== 'object' || key === null) {
+      if (!primitiveSet) {
+        primitiveSet = new Set();
       }
-    });
-  });
+      if (!primitiveSet.has(key)) {
+        primitiveSet.add(key);
+        distinct.push(item);
+      }
+    } else {
+      if (!immutableSet) {
+        immutableSet = Immutable.Set<NormalizedKey>().asMutable();
+      }
+      if (!immutableSet.has(key)) {
+        immutableSet.add(key);
+        distinct.push(item);
+      }
+    }
+  }
 
   return distinct;
 };
