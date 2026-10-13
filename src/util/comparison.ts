@@ -1,5 +1,7 @@
 import { Uncertainty } from '../datatypes/datatypes';
 
+const objectToString = Object.prototype.toString;
+
 function areNumbers(a: any, b: any) {
   return typeof a === 'number' && typeof b === 'number';
 }
@@ -84,6 +86,13 @@ export function equivalent(a: any, b: any) {
     return false;
   }
 
+  // Fast path for primitive comparison (numbers & booleans)
+  const typeA = typeof a;
+  const typeB = typeof b;
+  if (typeA === typeB && (typeA === 'number' || typeA === 'boolean')) {
+    return a === b;
+  }
+
   if (isCode(a)) {
     return codesAreEquivalent(a, b);
   }
@@ -98,12 +107,19 @@ export function equivalent(a: any, b: any) {
     return a.equivalent(b);
   }
 
-  const [aClass, bClass] = getClassOfObjects(a, b);
+  const aClass = objectToString.call(a);
+  const bClass = objectToString.call(b);
 
   switch (aClass) {
     case '[object Array]':
+      if (bClass !== '[object Array]') {
+        return false;
+      }
       return compareEveryItemInArrays(a, b, equivalent);
     case '[object Object]':
+      if (bClass !== '[object Object]') {
+        return false;
+      }
       return compareObjects(a, b, equivalent);
     case '[object String]':
       // Make sure b is also a string
@@ -120,22 +136,23 @@ export function equivalent(a: any, b: any) {
 }
 
 function isCode(object: any) {
-  return object.hasMatch && typeof object.hasMatch === 'function';
+  return object != null && typeof object.hasMatch === 'function';
 }
 
 function codesAreEquivalent(code1: any, code2: any) {
   return code1.hasMatch(code2);
 }
 
-function getClassOfObjects(object1: any, object2: any) {
-  return [object1, object2].map(obj => ({}.toString.call(obj)));
-}
-
 function compareEveryItemInArrays(array1: any[], array2: any[], comparisonFunction: any) {
-  return (
-    array1.length === array2.length &&
-    array1.every((item, i) => comparisonFunction(item, array2[i]))
-  );
+  if (array1.length !== array2.length) {
+    return false;
+  }
+  for (let i = 0; i < array1.length; i++) {
+    if (!comparisonFunction(array1[i], array2[i])) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function compareObjects(a: any, b: any, comparisonFunction: any) {
@@ -150,40 +167,51 @@ function classesEqual(object1: any, object2: any) {
 }
 
 function deepCompareKeysAndValues(a: any, b: any, comparisonFunction: any) {
-  let finalComparisonResult;
   const aKeys = getKeysFromObject(a).sort();
   const bKeys = getKeysFromObject(b).sort();
-  // Array.every() will only return true or false, so set a flag for if we should return null
+
+  if (aKeys.length !== bKeys.length) {
+    return false;
+  }
+
+  for (let i = 0; i < aKeys.length; i++) {
+    if (aKeys[i] !== bKeys[i]) {
+      return false;
+    }
+  }
+
+  // Array.every() replaced with for loop to avoid closure allocation per comparison
   let shouldReturnNull = false;
-  // Check if both arrays of keys are the same length and key names match
-  if (aKeys.length === bKeys.length && aKeys.every((value, index) => value === bKeys[index])) {
-    finalComparisonResult = aKeys.every(key => {
-      // if both are null we should return true to satisfy ignoring empty values in tuples
-      if (a[key] == null && b[key] == null) {
-        return true;
-      }
-      const comparisonResult = comparisonFunction(a[key], b[key]);
-      if (comparisonResult === null) {
-        shouldReturnNull = true;
-      }
-      return comparisonResult;
-    });
-  } else {
-    finalComparisonResult = false;
+  for (let i = 0; i < aKeys.length; i++) {
+    const key = aKeys[i];
+    // if both are null we should continue to satisfy ignoring empty values in tuples
+    if (a[key] == null && b[key] == null) {
+      continue;
+    }
+    const comparisonResult = comparisonFunction(a[key], b[key]);
+    if (comparisonResult === null) {
+      shouldReturnNull = true;
+    } else if (!comparisonResult) {
+      return false;
+    }
   }
 
   if (shouldReturnNull) {
     return null;
   }
-  return finalComparisonResult;
+  return true;
 }
 
 function getKeysFromObject(object: any) {
-  return Object.keys(object).filter(k => !isFunction(object[k]));
-}
-
-function isFunction(input: any) {
-  return input instanceof Function || {}.toString.call(input) === '[object Function]';
+  const keys = Object.keys(object);
+  const result: string[] = [];
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i];
+    if (typeof object[k] !== 'function') {
+      result.push(k);
+    }
+  }
+  return result;
 }
 
 export function equals(a: any, b: any) {
@@ -192,13 +220,20 @@ export function equals(a: any, b: any) {
     return null;
   }
 
+  // Fast path for primitive comparison (numbers, strings, booleans)
+  const typeA = typeof a;
+  const typeB = typeof b;
+  if (typeA === typeB && (typeA === 'number' || typeA === 'string' || typeA === 'boolean')) {
+    return a === b;
+  }
+
   // If one is a Quantity, use the Quantity equals function
-  if (a && a.isQuantity) {
+  if (a.isQuantity) {
     return a.equals(b);
   }
 
   // If one is a Ratio, use the ratio equals function
-  if (a && a.isRatio) {
+  if (a.isRatio) {
     return a.equals(b);
   }
 
@@ -214,17 +249,9 @@ export function equals(a: any, b: any) {
     return a.equals(b);
   }
 
-  // Return true of the objects are primitives and are strictly equal
-  if (
-    (typeof a === typeof b && typeof a === 'string') ||
-    typeof a === 'number' ||
-    typeof a === 'boolean'
-  ) {
-    return a === b;
-  }
-
   // Return false if they are instances of different classes
-  const [aClass, bClass] = getClassOfObjects(a, b);
+  const aClass = objectToString.call(a);
+  const bClass = objectToString.call(b);
   if (aClass !== bClass) {
     return false;
   }
@@ -235,7 +262,12 @@ export function equals(a: any, b: any) {
       return a.getTime() === b.getTime();
     case '[object RegExp]':
       // Compare the components of the regular expression
-      return ['source', 'global', 'ignoreCase', 'multiline'].every(p => a[p] === b[p]);
+      return (
+        a.source === b.source &&
+        a.global === b.global &&
+        a.ignoreCase === b.ignoreCase &&
+        a.multiline === b.multiline
+      );
     case '[object Array]':
       if (
         a.indexOf(null) >= 0 ||
