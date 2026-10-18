@@ -7,3 +7,4 @@ node_modules
 coverage
 *.original.coffee
 yarn-error.log
+*.cpuprofile
