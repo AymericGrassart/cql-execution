@@ -15,49 +15,6 @@ import {
 
 type DateTimeUnit = keyof DurationObjectUnits;
 
-// It's easiest and most performant to organize formats by length of the supported strings.
-// This way we can test strings only against the formats that have a chance of working.
-// NOTE: Formats use Luxon formats, documented here: https://moment.github.io/luxon/docs/manual/parsing.html#table-of-tokens
-const LENGTH_TO_DATE_FORMAT_MAP = (() => {
-  const ltdfMap = new Map();
-  ltdfMap.set(4, 'yyyy');
-  ltdfMap.set(7, 'yyyy-MM');
-  ltdfMap.set(10, 'yyyy-MM-dd');
-  return ltdfMap;
-})();
-
-const LENGTH_TO_DATETIME_FORMATS_MAP = (() => {
-  const formats: any = {
-    yyyy: '2012',
-    'yyyy-MM': '2012-01',
-    'yyyy-MM-dd': '2012-01-31',
-    "yyyy-MM-dd'T''Z'": '2012-01-31TZ',
-    "yyyy-MM-dd'T'ZZ": '2012-01-31T-04:00',
-    "yyyy-MM-dd'T'HH": '2012-01-31T12',
-    "yyyy-MM-dd'T'HH'Z'": '2012-01-31T12Z',
-    "yyyy-MM-dd'T'HHZZ": '2012-01-31T12-04:00',
-    "yyyy-MM-dd'T'HH:mm": '2012-01-31T12:30',
-    "yyyy-MM-dd'T'HH:mm'Z'": '2012-01-31T12:30Z',
-    "yyyy-MM-dd'T'HH:mmZZ": '2012-01-31T12:30-04:00',
-    "yyyy-MM-dd'T'HH:mm:ss": '2012-01-31T12:30:59',
-    "yyyy-MM-dd'T'HH:mm:ss'Z'": '2012-01-31T12:30:59Z',
-    "yyyy-MM-dd'T'HH:mm:ssZZ": '2012-01-31T12:30:59-04:00',
-    "yyyy-MM-dd'T'HH:mm:ss.SSS": '2012-01-31T12:30:59.000',
-    "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'": '2012-01-31T12:30:59.000Z',
-    "yyyy-MM-dd'T'HH:mm:ss.SSSZZ": '2012-01-31T12:30:59.000-04:00'
-  };
-  const ltdtfMap = new Map();
-  Object.keys(formats).forEach(k => {
-    const example = formats[k];
-    if (!ltdtfMap.has(example.length)) {
-      ltdtfMap.set(example.length, [k]);
-    } else {
-      ltdtfMap.get(example.length).push(k);
-    }
-  });
-  return ltdtfMap;
-})();
-
 function wholeLuxonDuration(duration: Duration, unit: DurationUnit) {
   const value = duration.get(unit);
   return value >= 0 ? Math.floor(value) : Math.ceil(value);
@@ -590,7 +547,7 @@ export class DateTime extends AbstractDate {
       return null;
     }
 
-    const matches = /(\d{4})(-(\d{2}))?(-(\d{2}))?(T((\d{2})(:(\d{2})(:(\d{2})(\.(\d+))?)?)?)?(Z|(([+-])(\d{2})(:?(\d{2}))?))?)?/.exec(
+    const matches = /^(\d{4})(-(\d{2}))?(-(\d{2}))?(T((\d{2})(:(\d{2})(:(\d{2})(\.(\d+))?)?)?)?(Z|(([+-])(\d{2})(:?(\d{2}))?))?)?$/.exec(
       string
     );
 
@@ -611,7 +568,8 @@ export class DateTime extends AbstractDate {
       string = normalizeMillisecondsFieldInString(string, matches[14]);
     }
 
-    if (!isValidDateTimeStringFormat(string)) {
+    // Optimization: Avoid slow Luxon parsing by reusing already captured regex match components
+    if (!isValidDateTimeStringFormat(string, matches)) {
       return null;
     }
 
@@ -1020,7 +978,7 @@ export class Date extends AbstractDate {
       return null;
     }
 
-    const matches = /(\d{4})(-(\d{2}))?(-(\d{2}))?/.exec(string);
+    const matches = /^(\d{4})(-(\d{2}))?(-(\d{2}))?$/.exec(string);
 
     if (matches == null) {
       return null;
@@ -1029,7 +987,8 @@ export class Date extends AbstractDate {
     const months = matches[3];
     const days = matches[5];
 
-    if (!isValidDateStringFormat(string)) {
+    // Optimization: Avoid slow Luxon parsing by reusing already captured regex match components
+    if (!isValidDateStringFormat(string, matches)) {
       return null;
     }
 
@@ -1311,35 +1270,78 @@ function daysInMonth(year: number | null, month: number | null) {
   return new jsDate(year, month, 0).getDate();
 }
 
-function isValidDateStringFormat(string: any) {
-  if (typeof string !== 'string') {
+function isValidDateStringFormat(string: any, matches?: RegExpExecArray | null) {
+  if (typeof string !== 'string' || !matches) {
     return false;
   }
 
-  const format = LENGTH_TO_DATE_FORMAT_MAP.get(string.length);
-  if (format == null) {
-    return false;
+  const year = parseInt(matches[1], 10);
+  if (matches[3] != null) {
+    const month = parseInt(matches[3], 10);
+    if (month < 1 || month > 12) {
+      return false;
+    }
+    if (matches[5] != null) {
+      const day = parseInt(matches[5], 10);
+      if (day < 1 || day > daysInMonth(year, month)) {
+        return false;
+      }
+    }
   }
-
-  return LuxonDateTime.fromFormat(string, format).isValid;
+  return true;
 }
 
-function isValidDateTimeStringFormat(string: any) {
-  if (typeof string !== 'string') {
+function isValidDateTimeStringFormat(string: any, matches?: RegExpExecArray | null) {
+  if (typeof string !== 'string' || !matches) {
     return false;
   }
 
-  // Luxon doesn't support +hh offset, so change it to +hh:00
-  if (/T[\d:.]*[+-]\d{2}$/.test(string)) {
-    string += ':00';
+  const year = parseInt(matches[1], 10);
+  if (matches[3] != null) {
+    const month = parseInt(matches[3], 10);
+    if (month < 1 || month > 12) {
+      return false;
+    }
+    if (matches[5] != null) {
+      const day = parseInt(matches[5], 10);
+      if (day < 1 || day > daysInMonth(year, month)) {
+        return false;
+      }
+      if (matches[8] != null) {
+        const hour = parseInt(matches[8], 10);
+        if (hour < 0 || hour > 23) {
+          return false;
+        }
+        if (matches[10] != null) {
+          const minute = parseInt(matches[10], 10);
+          if (minute < 0 || minute > 59) {
+            return false;
+          }
+          if (matches[12] != null) {
+            const second = parseInt(matches[12], 10);
+            if (second < 0 || second > 59) {
+              return false;
+            }
+          }
+        }
+      }
+    }
   }
 
-  const formats = LENGTH_TO_DATETIME_FORMATS_MAP.get(string.length);
-  if (formats == null) {
-    return false;
+  if (matches[18] != null) {
+    const tzHours = parseInt(matches[18], 10);
+    if (tzHours > 14) {
+      return false;
+    }
+    if (matches[20] != null) {
+      const tzMin = parseInt(matches[20], 10);
+      if (tzMin > 59) {
+        return false;
+      }
+    }
   }
 
-  return formats.some((fmt: any) => LuxonDateTime.fromFormat(string, fmt).isValid);
+  return true;
 }
 
 // Will return true if provided precision is unspecified or if
