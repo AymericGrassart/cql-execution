@@ -128,7 +128,7 @@ function codesAreEquivalent(code1: any, code2: any) {
 }
 
 function getClassOfObjects(object1: any, object2: any) {
-  return [object1, object2].map(obj => ({}.toString.call(obj)));
+  return [Object.prototype.toString.call(object1), Object.prototype.toString.call(object2)];
 }
 
 function compareEveryItemInArrays(array1: any[], array2: any[], comparisonFunction: any) {
@@ -151,12 +151,17 @@ function classesEqual(object1: any, object2: any) {
 
 function deepCompareKeysAndValues(a: any, b: any, comparisonFunction: any) {
   let finalComparisonResult;
-  const aKeys = getKeysFromObject(a).sort();
-  const bKeys = getKeysFromObject(b).sort();
+  const aKeys = getKeysFromObject(a);
+  const bKeys = getKeysFromObject(b);
+  if (aKeys.length !== bKeys.length) {
+    return false;
+  }
+  aKeys.sort();
+  bKeys.sort();
   // Array.every() will only return true or false, so set a flag for if we should return null
   let shouldReturnNull = false;
   // Check if both arrays of keys are the same length and key names match
-  if (aKeys.length === bKeys.length && aKeys.every((value, index) => value === bKeys[index])) {
+  if (aKeys.every((value, index) => value === bKeys[index])) {
     finalComparisonResult = aKeys.every(key => {
       // if both are null we should return true to satisfy ignoring empty values in tuples
       if (a[key] == null && b[key] == null) {
@@ -183,7 +188,7 @@ function getKeysFromObject(object: any) {
 }
 
 function isFunction(input: any) {
-  return input instanceof Function || {}.toString.call(input) === '[object Function]';
+  return typeof input === 'function';
 }
 
 export function equals(a: any, b: any) {
@@ -214,17 +219,21 @@ export function equals(a: any, b: any) {
     return a.equals(b);
   }
 
+  const typeA = typeof a;
+  const typeB = typeof b;
+
   // Return true of the objects are primitives and are strictly equal
-  if (
-    (typeof a === typeof b && typeof a === 'string') ||
-    typeof a === 'number' ||
-    typeof a === 'boolean'
-  ) {
-    return a === b;
+  if (typeA === typeB) {
+    if (typeA === 'string' || typeA === 'number' || typeA === 'boolean') {
+      return a === b;
+    }
+  } else {
+    return false;
   }
 
   // Return false if they are instances of different classes
-  const [aClass, bClass] = getClassOfObjects(a, b);
+  const aClass = Object.prototype.toString.call(a);
+  const bClass = Object.prototype.toString.call(b);
   if (aClass !== bClass) {
     return false;
   }

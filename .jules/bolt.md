@@ -1,0 +1,3 @@
+## 2025-05-18 - Avoid `{}.toString.call()` and Array Allocations in `equals()` Hot Paths
+**Learning:** `equals()` is called heavily during CQL execution (queries, filtering, distinct, sorting). Calling `getClassOfObjects(a, b)` allocated `[a, b]` arrays, created iterator closures, and instantiated empty objects `{}` for `.toString.call()` on every non-primitive comparison. Furthermore, sorting key arrays before checking key length caused unnecessary $O(N \log N)$ sorts on unequal objects.
+**Action:** Use `Object.prototype.toString.call(x)`, fast-path `typeof a !== typeof b` checks before fetching class tags, and check `aKeys.length !== bKeys.length` before sorting object keys.
