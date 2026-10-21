@@ -68,8 +68,10 @@ export function checkUnit(unit: any, allowEmptyUnits = true, allowCQLDateUnits =
 }
 
 export function convertUnit(fromVal: any, fromUnit: any, toUnit: any, adjustPrecision = true) {
-  [fromUnit, toUnit] = [fromUnit, toUnit].map(fixUnit);
-  const result = utils.convertUnitTo(fixUnit(fromUnit), fromVal, fixUnit(toUnit));
+  // Avoid redundant fixUnit calls and array allocations
+  fromUnit = fixUnit(fromUnit);
+  toUnit = fixUnit(toUnit);
+  const result = utils.convertUnitTo(fromUnit, fromVal, toUnit);
   if (result.status !== 'succeeded') {
     return;
   }
@@ -83,7 +85,8 @@ export function normalizeUnitsWhenPossible(val1: any, unit1: any, val2: any, uni
     return useCQLDateUnits ? convertToCQLDateUnit(unit) : unit;
   };
 
-  [unit1, unit2] = [unit1, unit2].map(u => fixUnit(u) as CQLUnitKey);
+  unit1 = fixUnit(unit1) as CQLUnitKey;
+  unit2 = fixUnit(unit2) as CQLUnitKey;
   if (unit1 === unit2) {
     return [val1, unit1, val2, unit2];
   }
@@ -136,7 +139,8 @@ export function compareUnits(unit1: any, unit2: any) {
 }
 
 export function getProductOfUnits(unit1: any, unit2: any): any {
-  [unit1, unit2] = [unit1, unit2].map(fixEmptyUnit);
+  unit1 = fixEmptyUnit(unit1);
+  unit2 = fixEmptyUnit(unit2);
   if (!checkUnit(unit1).valid || !checkUnit(unit2).valid) {
     return null;
   }
@@ -178,7 +182,8 @@ export function getProductOfUnits(unit1: any, unit2: any): any {
 }
 
 export function getQuotientOfUnits(unit1: any, unit2: any) {
-  [unit1, unit2] = [unit1, unit2].map(fixEmptyUnit);
+  unit1 = fixEmptyUnit(unit1);
+  unit2 = fixEmptyUnit(unit2);
   if (!checkUnit(unit1).valid || !checkUnit(unit2).valid) {
     return null;
   }

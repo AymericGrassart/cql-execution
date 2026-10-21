@@ -128,7 +128,7 @@ function codesAreEquivalent(code1: any, code2: any) {
 }
 
 function getClassOfObjects(object1: any, object2: any) {
-  return [object1, object2].map(obj => ({}.toString.call(obj)));
+  return [Object.prototype.toString.call(object1), Object.prototype.toString.call(object2)];
 }
 
 function compareEveryItemInArrays(array1: any[], array2: any[], comparisonFunction: any) {
@@ -183,7 +183,7 @@ function getKeysFromObject(object: any) {
 }
 
 function isFunction(input: any) {
-  return input instanceof Function || {}.toString.call(input) === '[object Function]';
+  return typeof input === 'function';
 }
 
 export function equals(a: any, b: any) {
