@@ -127,8 +127,9 @@ function codesAreEquivalent(code1: any, code2: any) {
   return code1.hasMatch(code2);
 }
 
+// Direct calls to Object.prototype.toString avoids array allocations and .map overhead.
 function getClassOfObjects(object1: any, object2: any) {
-  return [object1, object2].map(obj => ({}.toString.call(obj)));
+  return [Object.prototype.toString.call(object1), Object.prototype.toString.call(object2)];
 }
 
 function compareEveryItemInArrays(array1: any[], array2: any[], comparisonFunction: any) {

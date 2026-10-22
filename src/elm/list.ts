@@ -188,16 +188,12 @@ export const toDistinctList = (list: unknown[]): unknown[] => {
   const set = Immutable.Set<NormalizedKey>().asMutable();
   const distinct: unknown[] = [];
 
+  // Check membership with y.has(key) before insertion to avoid unnecessary
+  // calls to y.count() and avoid set mutation overhead on duplicate items.
   set.withMutations(y => {
     list_keys.forEach((key, i) => {
-      // Check set size
-      const setSize = y.count();
-
-      // Attempt to insert
-      y.add(key);
-
-      // If inserted, then size will increase; push to distinct
-      if (y.count() > setSize) {
+      if (!y.has(key)) {
+        y.add(key);
         distinct.push(list[i]);
       }
     });
