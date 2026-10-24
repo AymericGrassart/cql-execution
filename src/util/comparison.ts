@@ -128,7 +128,8 @@ function codesAreEquivalent(code1: any, code2: any) {
 }
 
 function getClassOfObjects(object1: any, object2: any) {
-  return [object1, object2].map(obj => ({}.toString.call(obj)));
+  // Avoid array allocation and .map() call during type extraction
+  return [Object.prototype.toString.call(object1), Object.prototype.toString.call(object2)];
 }
 
 function compareEveryItemInArrays(array1: any[], array2: any[], comparisonFunction: any) {
@@ -150,32 +151,44 @@ function classesEqual(object1: any, object2: any) {
 }
 
 function deepCompareKeysAndValues(a: any, b: any, comparisonFunction: any) {
-  let finalComparisonResult;
-  const aKeys = getKeysFromObject(a).sort();
-  const bKeys = getKeysFromObject(b).sort();
-  // Array.every() will only return true or false, so set a flag for if we should return null
+  const aKeys = getKeysFromObject(a);
+  const bKeys = getKeysFromObject(b);
+
+  // Early return if key counts differ before doing sort overhead
+  if (aKeys.length !== bKeys.length) {
+    return false;
+  }
+
+  aKeys.sort();
+  bKeys.sort();
+
+  // Fast loop for key matching
+  for (let i = 0; i < aKeys.length; i++) {
+    if (aKeys[i] !== bKeys[i]) {
+      return false;
+    }
+  }
+
+  // Fast loop for value comparison avoiding closures and .every calls
   let shouldReturnNull = false;
-  // Check if both arrays of keys are the same length and key names match
-  if (aKeys.length === bKeys.length && aKeys.every((value, index) => value === bKeys[index])) {
-    finalComparisonResult = aKeys.every(key => {
-      // if both are null we should return true to satisfy ignoring empty values in tuples
-      if (a[key] == null && b[key] == null) {
-        return true;
-      }
-      const comparisonResult = comparisonFunction(a[key], b[key]);
-      if (comparisonResult === null) {
-        shouldReturnNull = true;
-      }
-      return comparisonResult;
-    });
-  } else {
-    finalComparisonResult = false;
+  for (let i = 0; i < aKeys.length; i++) {
+    const key = aKeys[i];
+    // if both are null we satisfy ignoring empty values in tuples
+    if (a[key] == null && b[key] == null) {
+      continue;
+    }
+    const comparisonResult = comparisonFunction(a[key], b[key]);
+    if (comparisonResult === null) {
+      shouldReturnNull = true;
+    } else if (!comparisonResult) {
+      return false;
+    }
   }
 
   if (shouldReturnNull) {
     return null;
   }
-  return finalComparisonResult;
+  return true;
 }
 
 function getKeysFromObject(object: any) {
@@ -183,7 +196,8 @@ function getKeysFromObject(object: any) {
 }
 
 function isFunction(input: any) {
-  return input instanceof Function || {}.toString.call(input) === '[object Function]';
+  // Fast typeof check for function detection
+  return typeof input === 'function';
 }
 
 export function equals(a: any, b: any) {
