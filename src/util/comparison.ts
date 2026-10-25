@@ -98,7 +98,9 @@ export function equivalent(a: any, b: any) {
     return a.equivalent(b);
   }
 
-  const [aClass, bClass] = getClassOfObjects(a, b);
+  // Performance optimization: Avoid array allocation and .map in object class inspection
+  const aClass = Object.prototype.toString.call(a);
+  const bClass = Object.prototype.toString.call(b);
 
   switch (aClass) {
     case '[object Array]':
@@ -127,10 +129,6 @@ function codesAreEquivalent(code1: any, code2: any) {
   return code1.hasMatch(code2);
 }
 
-function getClassOfObjects(object1: any, object2: any) {
-  return [object1, object2].map(obj => ({}.toString.call(obj)));
-}
-
 function compareEveryItemInArrays(array1: any[], array2: any[], comparisonFunction: any) {
   return (
     array1.length === array2.length &&
@@ -149,41 +147,60 @@ function classesEqual(object1: any, object2: any) {
   return object2 instanceof object1.constructor && object1 instanceof object2.constructor;
 }
 
+// Performance optimization: Avoid creating closures and sorting when key counts differ.
 function deepCompareKeysAndValues(a: any, b: any, comparisonFunction: any) {
-  let finalComparisonResult;
-  const aKeys = getKeysFromObject(a).sort();
-  const bKeys = getKeysFromObject(b).sort();
-  // Array.every() will only return true or false, so set a flag for if we should return null
+  const aKeys = getKeysFromObject(a);
+  const bKeys = getKeysFromObject(b);
+
+  // Early return if key counts do not match to avoid sorting
+  if (aKeys.length !== bKeys.length) {
+    return false;
+  }
+
+  aKeys.sort();
+  bKeys.sort();
+
+  // Verify key names match
+  for (let i = 0; i < aKeys.length; i++) {
+    if (aKeys[i] !== bKeys[i]) {
+      return false;
+    }
+  }
+
   let shouldReturnNull = false;
-  // Check if both arrays of keys are the same length and key names match
-  if (aKeys.length === bKeys.length && aKeys.every((value, index) => value === bKeys[index])) {
-    finalComparisonResult = aKeys.every(key => {
-      // if both are null we should return true to satisfy ignoring empty values in tuples
-      if (a[key] == null && b[key] == null) {
-        return true;
-      }
-      const comparisonResult = comparisonFunction(a[key], b[key]);
-      if (comparisonResult === null) {
-        shouldReturnNull = true;
-      }
-      return comparisonResult;
-    });
-  } else {
-    finalComparisonResult = false;
+  for (let i = 0; i < aKeys.length; i++) {
+    const key = aKeys[i];
+    // if both are null we should return true to satisfy ignoring empty values in tuples
+    if (a[key] == null && b[key] == null) {
+      continue;
+    }
+    const comparisonResult = comparisonFunction(a[key], b[key]);
+    if (comparisonResult === null) {
+      shouldReturnNull = true;
+      break;
+    }
+    if (!comparisonResult) {
+      return false;
+    }
   }
 
   if (shouldReturnNull) {
     return null;
   }
-  return finalComparisonResult;
+  return true;
 }
 
+// Performance optimization: Fast for-loop without allocating intermediate array from .filter
 function getKeysFromObject(object: any) {
-  return Object.keys(object).filter(k => !isFunction(object[k]));
-}
-
-function isFunction(input: any) {
-  return input instanceof Function || {}.toString.call(input) === '[object Function]';
+  const keys = Object.keys(object);
+  const result: string[] = [];
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i];
+    if (typeof object[k] !== 'function') {
+      result.push(k);
+    }
+  }
+  return result;
 }
 
 export function equals(a: any, b: any) {
@@ -223,8 +240,9 @@ export function equals(a: any, b: any) {
     return a === b;
   }
 
-  // Return false if they are instances of different classes
-  const [aClass, bClass] = getClassOfObjects(a, b);
+  // Performance optimization: Avoid array allocation and .map in object class inspection
+  const aClass = Object.prototype.toString.call(a);
+  const bClass = Object.prototype.toString.call(b);
   if (aClass !== bClass) {
     return false;
   }
