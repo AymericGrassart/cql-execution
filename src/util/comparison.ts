@@ -98,7 +98,18 @@ export function equivalent(a: any, b: any) {
     return a.equivalent(b);
   }
 
-  const [aClass, bClass] = getClassOfObjects(a, b);
+  const typeA = typeof a;
+  const typeB = typeof b;
+
+  if (typeA === 'string' && typeB === 'string') {
+    // String equivalence is case- and locale insensitive
+    a = a.replace(/\s/g, ' ');
+    b = b.replace(/\s/g, ' ');
+    return a.localeCompare(b, 'en', { sensitivity: 'base' }) === 0;
+  }
+
+  const aClass = Object.prototype.toString.call(a);
+  const bClass = Object.prototype.toString.call(b);
 
   switch (aClass) {
     case '[object Array]':
@@ -106,7 +117,7 @@ export function equivalent(a: any, b: any) {
     case '[object Object]':
       return compareObjects(a, b, equivalent);
     case '[object String]':
-      // Make sure b is also a string
+      // Make sure b is also a string (e.g. String objects)
       if (bClass === '[object String]') {
         // String equivalence is case- and locale insensitive
         a = a.replace(/\s/g, ' ');
@@ -120,15 +131,11 @@ export function equivalent(a: any, b: any) {
 }
 
 function isCode(object: any) {
-  return object.hasMatch && typeof object.hasMatch === 'function';
+  return object && typeof object.hasMatch === 'function';
 }
 
 function codesAreEquivalent(code1: any, code2: any) {
   return code1.hasMatch(code2);
-}
-
-function getClassOfObjects(object1: any, object2: any) {
-  return [object1, object2].map(obj => ({}.toString.call(obj)));
 }
 
 function compareEveryItemInArrays(array1: any[], array2: any[], comparisonFunction: any) {
@@ -183,7 +190,7 @@ function getKeysFromObject(object: any) {
 }
 
 function isFunction(input: any) {
-  return input instanceof Function || {}.toString.call(input) === '[object Function]';
+  return typeof input === 'function';
 }
 
 export function equals(a: any, b: any) {
@@ -192,13 +199,20 @@ export function equals(a: any, b: any) {
     return null;
   }
 
+  // Fast-path primitive type comparisons (numbers, booleans, strings) before expensive object checks
+  const typeA = typeof a;
+  const typeB = typeof b;
+  if (typeA === typeB && (typeA === 'number' || typeA === 'boolean' || typeA === 'string')) {
+    return a === b;
+  }
+
   // If one is a Quantity, use the Quantity equals function
-  if (a && a.isQuantity) {
+  if (a.isQuantity) {
     return a.equals(b);
   }
 
   // If one is a Ratio, use the ratio equals function
-  if (a && a.isRatio) {
+  if (a.isRatio) {
     return a.equals(b);
   }
 
@@ -214,17 +228,13 @@ export function equals(a: any, b: any) {
     return a.equals(b);
   }
 
-  // Return true of the objects are primitives and are strictly equal
-  if (
-    (typeof a === typeof b && typeof a === 'string') ||
-    typeof a === 'number' ||
-    typeof a === 'boolean'
-  ) {
-    return a === b;
+  if (typeA !== typeB) {
+    return false;
   }
 
   // Return false if they are instances of different classes
-  const [aClass, bClass] = getClassOfObjects(a, b);
+  const aClass = Object.prototype.toString.call(a);
+  const bClass = Object.prototype.toString.call(b);
   if (aClass !== bClass) {
     return false;
   }
