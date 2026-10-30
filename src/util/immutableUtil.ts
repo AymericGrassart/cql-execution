@@ -6,6 +6,17 @@ import { convertUnit } from './units';
 
 const ucumUtilInstance = ucum.UcumLhcUtils.getInstance();
 
+// Cache Map for commensurablesList lookups to avoid expensive regex/parsing in ucum-lhc for repeated units
+const commensurablesCache = new Map<string, any>();
+function getCommensurables(unit: string) {
+  let cached = commensurablesCache.get(unit);
+  if (cached === undefined) {
+    cached = ucumUtilInstance.commensurablesList(unit);
+    commensurablesCache.set(unit, cached);
+  }
+  return cached;
+}
+
 type Primitive = string | number | boolean | bigint | symbol | undefined | null;
 export type NormalizedKey = Primitive | Immutable.Collection<NormalizedKey, unknown>;
 
@@ -36,9 +47,7 @@ export const toNormalizedKey = (js: any): NormalizedKey => {
   // Handle objects - normalize as necessary to generate unique keys
   switch (js.constructor) {
     case Array:
-      return Immutable.Seq(js)
-        .map((x: any) => toNormalizedKey(x))
-        .toList();
+      return Immutable.List(js.map((x: any) => toNormalizedKey(x)));
 
     case Code:
       return Immutable.Map({
@@ -83,8 +92,8 @@ export const toNormalizedKey = (js: any): NormalizedKey => {
         });
       }
 
-      // Get the normalized base unit
-      const baseUnitKey = ucumUtilInstance.commensurablesList(js.unit)[0];
+      // Get the normalized base unit (using cached commensurables lookup)
+      const baseUnitKey = getCommensurables(js.unit)[0];
 
       if (!baseUnitKey) {
         // No units found - normalization not possible and use provided values
