@@ -293,5 +293,7 @@ describe('equivalent', () => {
     equivalent('a', 'A').should.be.true();
     equivalent('abc', 'abc').should.be.true();
     equivalent('abc', 'abcd').should.be.false();
+    equivalent('hello\tworld\n', 'hello world ').should.be.true();
+    equivalent('foo bar', 'foo baz').should.be.false();
   });
 });
