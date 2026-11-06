@@ -1,0 +1,3 @@
+## 2025-05-15 - Linear pointer iteration vs Array.shift in async merge sort
+**Learning:** `asyncMergeSort`'s `merge` helper in `src/util/util.ts` previously used `left.shift()` and `right.shift()` inside a `while (left.length > 0 && right.length > 0)` loop. In V8/JavaScript arrays, `shift()` is an O(n) operation because every subsequent item in memory must be shifted leftward. Consequently, merging two sorted lists of size n degraded from O(n) to O(n^2), causing substantial CPU and memory overhead during sorting in query `sort` clauses.
+**Action:** When implementing divide-and-conquer routines or merging arrays, always track positions using index pointers (`i`, `j`) rather than mutating inputs with `shift()`.
