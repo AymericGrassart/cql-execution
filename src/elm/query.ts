@@ -320,15 +320,32 @@ export class QueryLetRef extends AliasRef {
 
 // cartesianProductOf function based on Chris West's function:
 // https://cwestblog.com/2011/05/02/cartesian-product-of-multiple-arrays/
+// Optimized with a fast path for the predominant single-source query case,
+// avoiding reduce(), nested closures, and unnecessary array allocations.
 function cartesianProductOf(sources: any[]) {
+  if (sources.length === 0) {
+    return [[]];
+  }
+  // Fast path: the vast majority of CQL queries have a single source.
+  // Directly build the array of 1-element arrays instead of invoking reduce/concat.
+  if (sources.length === 1) {
+    const s0 = sources[0];
+    const len = s0.length;
+    const ret = new Array(len);
+    for (let i = 0; i < len; i++) {
+      ret[i] = [s0[i]];
+    }
+    return ret;
+  }
   return sources.reduce(
     (a: any[], b: any[]) => {
       const ret: any[] = [];
-      a.forEach(a => {
-        b.forEach(b => {
-          ret.push(a.concat([b]));
-        });
-      });
+      for (let i = 0; i < a.length; i++) {
+        const itemA = a[i];
+        for (let j = 0; j < b.length; j++) {
+          ret.push(itemA.concat([b[j]]));
+        }
+      }
       return ret;
     },
     [[]]
