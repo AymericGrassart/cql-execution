@@ -5605,7 +5605,10 @@ class Flatten extends expression_1.Expression {
     async exec(ctx) {
         const arg = await this.execArgs(ctx);
         if ((0, util_1.typeIsArray)(arg) && arg.every(x => (0, util_1.typeIsArray)(x))) {
-            return arg.reduce((x, y) => x.concat(y), []);
+            // Performance optimization: Array.prototype.flat(1) flattens in O(n) time
+            // without creating intermediate arrays at each step, avoiding the O(n^2) cost
+            // and GC overhead of Array.prototype.reduce with concat.
+            return arg.flat(1);
         }
         else {
             return arg;
