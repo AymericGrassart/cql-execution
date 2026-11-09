@@ -5627,20 +5627,25 @@ class Distinct extends expression_1.Expression {
 }
 exports.Distinct = Distinct;
 const toDistinctList = (list) => {
-    const list_keys = list.map(immutableUtil_1.toNormalizedKey);
+    // Optimization: Empty and single-element lists are already distinct.
+    // Avoids allocating an Immutable Set and key normalization overhead.
+    if (list.length <= 1) {
+        return list.slice();
+    }
     const set = immutable_1.default.Set().asMutable();
     const distinct = [];
     set.withMutations(y => {
-        list_keys.forEach((key, i) => {
-            // Check set size
-            const setSize = y.count();
-            // Attempt to insert
-            y.add(key);
-            // If inserted, then size will increase; push to distinct
-            if (y.count() > setSize) {
-                distinct.push(list[i]);
+        for (let i = 0; i < list.length; i++) {
+            const item = list[i];
+            const key = (0, immutableUtil_1.toNormalizedKey)(item);
+            // Optimization: Checking set membership via has() is faster than
+            // checking size via count() before and after add().
+            // In addition, processing keys on-the-fly avoids an intermediate array allocation.
+            if (!y.has(key)) {
+                y.add(key);
+                distinct.push(item);
             }
-        });
+        }
     });
     return distinct;
 };
