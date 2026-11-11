@@ -92,18 +92,22 @@ export async function asyncMergeSort<T>(arr: T[], compareFn: SortCompareFn<T>): 
 
 async function merge<T>(left: T[], right: T[], compareFn: SortCompareFn<T>) {
   const sorted: T[] = [];
-  while (left.length > 0 && right.length > 0) {
-    if ((await compareFn(left[0], right[0])) <= 0) {
-      const sortedElem = left.shift();
-      if (sortedElem !== undefined) {
-        sorted.push(sortedElem);
-      }
+  // Use index pointers instead of Array.prototype.shift() to avoid O(n) element shifts
+  // on every iteration when merging sorted sub-arrays.
+  let leftIdx = 0;
+  let rightIdx = 0;
+  while (leftIdx < left.length && rightIdx < right.length) {
+    if ((await compareFn(left[leftIdx], right[rightIdx])) <= 0) {
+      sorted.push(left[leftIdx++]);
     } else {
-      const sortedElem = right.shift();
-      if (sortedElem !== undefined) {
-        sorted.push(sortedElem);
-      }
+      sorted.push(right[rightIdx++]);
     }
   }
-  return [...sorted, ...left, ...right];
+  while (leftIdx < left.length) {
+    sorted.push(left[leftIdx++]);
+  }
+  while (rightIdx < right.length) {
+    sorted.push(right[rightIdx++]);
+  }
+  return sorted;
 }
